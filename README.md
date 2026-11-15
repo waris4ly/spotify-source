@@ -4,8 +4,6 @@ A rewritten Spotify source manager for Lavaplayer and Lavalink v4.
 
 Supports Spotify tracks, albums, playlists, artists, podcasts, episodes, and audiobooks with on-demand audio resolution and built-in rate-limit handling.
 
-Spotify's CDN audio streams are DRM-encrypted. To provide music playback, `spotify-source` loads metadata directly from Spotify and resolves playable audio streams on-demand via ISRC fingerprints and duration matching against YouTube (or any registered playable source). Catalog requests are routed across Spotify's public web player backend and official developer API with automatic circuit breaker failovers and in-memory in-flight deduplication.
-
 ## Table of Contents
 
 - [Features](#features)
