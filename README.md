@@ -2,7 +2,7 @@
 
 A rewritten Spotify source manager for Lavaplayer.
 
-Supports Spotify tracks, albums, and playlists with on-demand audio resolution and built-in rate-limit handling.
+Supports Spotify tracks, albums, playlists, artists, podcasts, episodes, and audiobooks with on-demand audio resolution and built-in rate-limit handling.
 
 ## Table of Contents
 
