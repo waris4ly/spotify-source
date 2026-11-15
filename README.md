@@ -7,18 +7,21 @@ Supports Spotify tracks, albums, playlists, artists, podcasts, episodes, and aud
 ## Table of Contents
 
 - [Features](#features)
+  - Overview of core capabilities, circuit breakers, and on-demand stream mirroring.
 - [Plugin](#plugin)
-  - [Installation](#installation)
-  - [Configuration](#configuration-applicationyml)
+  - Instructions for installing and configuring the Lavalink v4 plugin.
 - [Common](#common)
-  - [Gradle Setup](#gradle-setup)
-  - [Maven Setup](#maven-setup)
-  - [Usage](#usage)
+  - Standalone Lavaplayer 2.x source manager setup for Gradle, Maven, and JVM bots.
 - [Search Prefixes and Links](#search-prefixes-and-links)
+  - Supported URL formats, short links, and search prefixes (`spsearch:`, `spsuggest:`, `sprec:`, `spsimilar:`).
 - [Track Plugin Info](#track-plugin-info)
+  - Extended metadata payloads including artwork colors, canvas video loops, and ISRC codes.
 - [Important Notes](#important-notes)
+  - Operational details on LavaSrc conflict prevention, playable audio mirrors, and Spotify Premium.
 - [Issues and Support](#issues-and-support)
+  - Bug reporting, feature request templates, and troubleshooting guidelines.
 - [License](#license)
+  - Project licensing under the MIT License.
 
 ---
 
