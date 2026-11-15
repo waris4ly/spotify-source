@@ -103,6 +103,30 @@ dependencies {
 }
 ```
 
+### Maven Setup
+
+```xml
+<repositories>
+    <repository>
+        <id>lavalink-releases</id>
+        <url>https://maven.lavalink.dev/releases</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>dev.arbjerg</groupId>
+        <artifactId>lavaplayer</artifactId>
+        <version>2.2.7</version>
+    </dependency>
+    <dependency>
+        <groupId>dev.waris.spotify</groupId>
+        <artifactId>common</artifactId>
+        <version>x.x.x</version>
+    </dependency>
+</dependencies>
+```
+
 ### Usage
 
 **Kotlin:**
