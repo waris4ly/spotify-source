@@ -1,0 +1,67 @@
+name: Bug report
+description: Create a new bug report for us to investigate and fix.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |-
+        If you would like to discuss new features, please select "Feature request" when creating a new issue instead.
+  - type: checkboxes
+    attributes:
+      label: Basic Troubleshooting
+      description: |-
+        Make sure you have checked the following first.
+        Options marked with (MANDATORY) MUST be done, otherwise your issue may be closed and locked without further response.
+      options:
+        - label: I have checked for similar issues (open AND closed), and my issue is not a duplicate. (MANDATORY)
+          required: true
+        - label: I have checked for pull requests that may already address my issue. (MANDATORY)
+          required: true
+        - label: I am using (and my issue is reproducible on) the latest version of spotify-source.
+          required: true
+        - label: I DO NOT confirm that this has been filled out truthfully.
+          required: false
+  - type: input
+    attributes:
+      label: "Version of spotify-source"
+      placeholder: "Example: 1.0.0"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: "The search query/queries, URL(s), playlist ID(s)/URL(s) or track ID(s)/URL(s) that triggered the issue"
+      description: |-
+        If a search query failed to load and threw an error, provide the entire query, including
+        the search prefix if applicable (i.e. "spsearch:"/"spsuggest:"/"sprec:"/"spsimilar:").
+        For other identifiers, include the complete, unaltered input.
+        If you are specifying multiple, please separate each item with a comma (item1, item2, ...)
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Code Example / Configuration"
+      description: |-
+        Provide a minimum viable code sample (if using standalone Lavaplayer) or your application.yml configuration (if using Lavalink plugin) that can reproduce your issue.
+        Exclude any sensitive information, such as IP addresses, tokens, keys, client secrets, etc.
+        If this is not applicable, just write "N/A"
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: "Exception and Stacktrace"
+      description: |-
+        If your issue relates to an error thrown by spotify-source, please paste the error here.
+        Include the ENTIRE stacktrace if available.
+        You may redact sensitive information such as IP addresses, tokens, keys, secrets, etc.
+        If this is not applicable, just write "N/A".
+      render: text
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: "What is your configuration?"
+      description: |-
+        Specify your configuration mode (e.g. internal web player backend, official Spotify API with clientId/clientSecret, or custom mirror options) as per your application.yml (if using Lavalink) or constructor options (if invoking spotify-source directly).
+    validations:
+      required: true

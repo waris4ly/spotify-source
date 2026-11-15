@@ -1,0 +1,70 @@
+{
+  "tracks": {
+    "items": [
+      {
+        "album": {
+          "id": "7aJuG4TFXa2hmE4z1yxc3n",
+          "name": "Single"
+        },
+        "artists": [
+          {
+            "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+            "name": "Billie Eilish"
+          }
+        ],
+        "duration_ms": 200000,
+        "explicit": false,
+        "id": "4eoOQgFQ0rLMKNP8KcUNWc",
+        "is_local": false,
+        "name": "valid track 1",
+        "type": "track"
+      },
+      null,
+      {
+        "duration_ms": 100000,
+        "name": "missing id"
+      },
+      {
+        "duration_ms": 100000,
+        "id": "1111111111111111111111"
+      },
+      {
+        "duration_ms": 100000,
+        "id": "invalid!id!chars",
+        "name": "invalid base62"
+      },
+      {
+        "duration_ms": 100000,
+        "id": "localtrackid1234567890",
+        "is_local": true,
+        "name": "local track",
+        "type": "track"
+      },
+      {
+        "duration_ms": 100000,
+        "id": "episodetrack1234567890",
+        "is_local": false,
+        "name": "podcast episode",
+        "type": "episode"
+      },
+      {
+        "album": {
+          "id": "7aJuG4TFXa2hmE4z1yxc3n",
+          "name": "Album"
+        },
+        "artists": [
+          {
+            "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+            "name": "Billie Eilish"
+          }
+        ],
+        "duration_ms": 190000,
+        "explicit": true,
+        "id": "2dK4V9B9qE6v0cK7x2A6B3",
+        "is_local": false,
+        "name": "valid track 2",
+        "type": "track"
+      }
+    ]
+  }
+}

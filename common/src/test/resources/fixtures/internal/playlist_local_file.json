@@ -1,0 +1,68 @@
+{
+  "data": {
+    "playlistV2": {
+      "__typename": "Playlist",
+      "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "name": "Local Files Mix",
+      "ownerV2": {
+        "data": {
+          "name": "User"
+        }
+      },
+      "images": {
+        "items": []
+      },
+      "content": {
+        "totalCount": 2,
+        "items": [
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:local:Artist:Album:Song:200",
+                "name": "Local Audio Track",
+                "is_local": true,
+                "trackDuration": {
+                  "totalMilliseconds": 200000
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Local Artist"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+                "name": "Never Gonna Give You Up",
+                "trackDuration": {
+                  "totalMilliseconds": 213573
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Rick Astley"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

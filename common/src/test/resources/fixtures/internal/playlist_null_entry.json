@@ -1,0 +1,50 @@
+{
+  "data": {
+    "playlistV2": {
+      "__typename": "Playlist",
+      "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "name": "Null Items Playlist",
+      "ownerV2": {
+        "data": {
+          "name": "User"
+        }
+      },
+      "images": {
+        "items": []
+      },
+      "content": {
+        "totalCount": 3,
+        "items": [
+          null,
+          {
+            "itemV2": null
+          },
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+                "name": "Never Gonna Give You Up",
+                "trackDuration": {
+                  "totalMilliseconds": 213573
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Rick Astley"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

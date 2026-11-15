@@ -1,0 +1,71 @@
+{
+  "data": {
+    "playlistV2": {
+      "__typename": "Playlist",
+      "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "name": "Removed Tracks Playlist",
+      "ownerV2": {
+        "data": {
+          "name": "User"
+        }
+      },
+      "images": {
+        "items": []
+      },
+      "content": {
+        "totalCount": 2,
+        "items": [
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:0000000000000000000001",
+                "name": "Deleted Song",
+                "trackDuration": {
+                  "totalMilliseconds": 180000
+                },
+                "playability": {
+                  "playable": false,
+                  "reason": "PLAYABILITY_RESTRICTION"
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Unavailable Artist"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+                "name": "Never Gonna Give You Up",
+                "trackDuration": {
+                  "totalMilliseconds": 213573
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Rick Astley"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

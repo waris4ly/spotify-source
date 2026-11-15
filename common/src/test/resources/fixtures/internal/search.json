@@ -1,0 +1,49 @@
+{
+  "data": {
+    "searchV2": {
+      "tracksV2": {
+        "totalCount": 100,
+        "items": [
+          {
+            "item": {
+              "__typename": "TrackResponseWrapper",
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+                "name": "Never Gonna Give You Up",
+                "trackDuration": {
+                  "totalMilliseconds": 213573
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Rick Astley"
+                      },
+                      "uri": "spotify:artist:0gxyHStUYeYToDxYgdnq0E"
+                    }
+                  ]
+                },
+                "albumOfTrack": {
+                  "name": "Whenever You Need Somebody",
+                  "coverArt": {
+                    "sources": [
+                      {
+                        "url": "https://i.scdn.co/image/ab67616d0000b2735755e164993798e0c9ef7d7a",
+                        "width": 640,
+                        "height": 640
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

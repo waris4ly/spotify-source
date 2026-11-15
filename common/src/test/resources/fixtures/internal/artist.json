@@ -1,0 +1,62 @@
+{
+  "data": {
+    "artistUnion": {
+      "__typename": "Artist",
+      "uri": "spotify:artist:4Z8W4fKeB5YxbusRsdQVPb",
+      "profile": {
+        "name": "Radiohead"
+      },
+      "visuals": {
+        "avatarImage": {
+          "sources": [
+            {
+              "url": "https://i.scdn.co/image/ab6761610000e5eb1d2004d2e0ccf3411f18e957",
+              "width": 640,
+              "height": 640
+            }
+          ]
+        }
+      },
+      "discography": {
+        "topTracks": {
+          "items": [
+            {
+              "track": {
+                "uri": "spotify:track:70LAK0Igtanr9ApsLtwv6s",
+                "name": "Creep",
+                "trackDuration": {
+                  "totalMilliseconds": 238640
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Radiohead"
+                      },
+                      "uri": "spotify:artist:4Z8W4fKeB5YxbusRsdQVPb"
+                    }
+                  ]
+                },
+                "albumOfTrack": {
+                  "name": "Pablo Honey",
+                  "coverArt": {
+                    "sources": [
+                      {
+                        "url": "https://i.scdn.co/image/ab67616d0000b273ec548c00d3ac2f10be73366d",
+                        "width": 640,
+                        "height": 640
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

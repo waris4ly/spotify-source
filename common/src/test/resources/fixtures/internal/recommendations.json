@@ -1,0 +1,38 @@
+{
+  "data": {
+    "seoRecommendedTrack": {
+      "items": [
+        {
+          "data": {
+            "__typename": "Track",
+            "id": "2xLMifQCjDGFmkHkpNLD9h",
+            "uri": "spotify:track:2xLMifQCjDGFmkHkpNLD9h",
+            "name": "SICKO MODE",
+            "trackDuration": {
+              "totalMilliseconds": 312820
+            },
+            "artists": {
+              "items": [
+                {
+                  "profile": {
+                    "name": "Travis Scott"
+                  }
+                }
+              ]
+            },
+            "albumOfTrack": {
+              "coverArt": {
+                "sources": [
+                  {
+                    "url": "https://i.scdn.co/image/ab67616d0000b273072e9faef2ef7b6db63834a3",
+                    "width": 640
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

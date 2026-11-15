@@ -1,0 +1,32 @@
+{
+  "data": {
+    "seoRecommendedTrackAlbum": {
+      "items": [
+        {
+          "data": {
+            "__typename": "Album",
+            "name": "ASTROWORLD",
+            "uri": "spotify:album:41GuZcammIkupRtYGDsvVa",
+            "artists": {
+              "items": [
+                {
+                  "profile": {
+                    "name": "Travis Scott"
+                  }
+                }
+              ]
+            },
+            "coverArt": {
+              "sources": [
+                {
+                  "url": "https://i.scdn.co/image/ab67616d0000b273072e9faef2ef7b6db63834a3",
+                  "width": 640
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "data": {
+    "playlistV2": {
+      "__typename": "Playlist",
+      "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "name": "世界 Top 50 🎵",
+      "ownerV2": {
+        "data": {
+          "name": "公式プレイリスト"
+        }
+      },
+      "images": {
+        "items": []
+      },
+      "content": {
+        "totalCount": 3,
+        "items": [
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:6V17vW1U8yA7yK3E9x4N1F",
+                "name": "夜に駆ける",
+                "trackDuration": {
+                  "totalMilliseconds": 261013
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "YOASOBI"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:2dpaMVqcW0nwyxsWhjGNaW",
+                "name": "Смерти больше нет",
+                "trackDuration": {
+                  "totalMilliseconds": 195000
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "IC3PEAK"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:5ViLKrbyL3HD6wsq3AB9eI",
+                "name": "No Artist Song",
+                "trackDuration": {
+                  "totalMilliseconds": 144101
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": []
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

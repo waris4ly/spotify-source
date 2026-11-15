@@ -1,0 +1,52 @@
+{
+  "data": {
+    "searchV2": {
+      "topResultsV2": {
+        "itemsV2": [
+          {
+            "item": {
+              "__typename": "SearchAutoCompleteEntity",
+              "data": {
+                "text": "Taylor Swift",
+                "uri": "spotify:search:Taylor%20Swift"
+              }
+            }
+          },
+          {
+            "item": {
+              "__typename": "TrackResponseWrapper",
+              "data": {
+                "__typename": "Track",
+                "id": "0V3wPSX9ygBnCm8psDIegu",
+                "uri": "spotify:track:0V3wPSX9ygBnCm8psDIegu",
+                "name": "Anti-Hero",
+                "trackDuration": {
+                  "totalMilliseconds": 200690
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Taylor Swift"
+                      }
+                    }
+                  ]
+                },
+                "albumOfTrack": {
+                  "coverArt": {
+                    "sources": [
+                      {
+                        "url": "https://i.scdn.co/image/ab67616d0000b273bb54dde68cd23e2a268ae0f5",
+                        "width": 640
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

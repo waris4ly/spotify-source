@@ -1,0 +1,46 @@
+{
+  "data": {
+    "playlistV2": {
+      "__typename": "Playlist",
+      "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "name": "Long Playlist",
+      "ownerV2": {
+        "data": {
+          "name": "Spotify"
+        }
+      },
+      "images": {
+        "items": []
+      },
+      "content": {
+        "totalCount": 100,
+        "items": [
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+                "name": "Track One",
+                "trackDuration": {
+                  "totalMilliseconds": 200000
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Artist One"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

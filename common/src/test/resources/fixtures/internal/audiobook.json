@@ -1,0 +1,54 @@
+{
+  "data": {
+    "podcastUnionV2": {
+      "__typename": "Audiobook",
+      "uri": "spotify:show:3234567890123456789012",
+      "name": "Great Audio Book",
+      "publisher": {
+        "name": "Author Publisher"
+      },
+      "coverArt": {
+        "sources": [
+          {
+            "url": "https://i.scdn.co/image/ab6765630000ba8abbccddee1122",
+            "width": 640
+          }
+        ]
+      },
+      "chaptersV2": {
+        "totalCount": 1,
+        "items": [
+          {
+            "entity": {
+              "data": {
+                "__typename": "Chapter",
+                "id": "7125459801234567890123",
+                "uri": "spotify:chapter:7125459801234567890123",
+                "name": "Chapter 1: The Beginning",
+                "duration": {
+                  "totalMilliseconds": 1800000
+                },
+                "audiobookV2": {
+                  "data": {
+                    "name": "Great Audio Book"
+                  }
+                },
+                "coverArt": {
+                  "sources": [
+                    {
+                      "url": "https://i.scdn.co/image/ab6765630000ba8abbccddee1122",
+                      "width": 640
+                    }
+                  ]
+                },
+                "contentRating": {
+                  "label": "NONE"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

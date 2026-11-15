@@ -1,0 +1,59 @@
+{
+  "artists": [
+    {
+      "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+      "name": "Billie Eilish"
+    }
+  ],
+  "id": "7aJuG4TFXa2hmE4z1yxc3n",
+  "images": [
+    {
+      "height": 640,
+      "url": "https://i.scdn.co/image/ab67616d0000b27371d62ea7ea8a5be92d3c1f62",
+      "width": 640
+    },
+    {
+      "height": 300,
+      "url": "https://i.scdn.co/image/ab67616d00001e0271d62ea7ea8a5be92d3c1f62",
+      "width": 300
+    }
+  ],
+  "name": "HIT ME HARD AND SOFT",
+  "total_tracks": 10,
+  "tracks": {
+    "items": [
+      {
+        "artists": [
+          {
+            "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+            "name": "Billie Eilish"
+          }
+        ],
+        "duration_ms": 184000,
+        "explicit": false,
+        "id": "1vK4V9B9qE6v0cK7x2A6B2",
+        "is_local": false,
+        "name": "SKINNY",
+        "track_number": 1
+      },
+      {
+        "artists": [
+          {
+            "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+            "name": "Billie Eilish"
+          }
+        ],
+        "duration_ms": 314000,
+        "explicit": true,
+        "id": "2dK4V9B9qE6v0cK7x2A6B3",
+        "is_local": false,
+        "name": "LUNCH",
+        "track_number": 2
+      }
+    ],
+    "limit": 2,
+    "next": "https://api.spotify.com/v1/albums/7aJuG4TFXa2hmE4z1yxc3n/tracks?offset=2&limit=2",
+    "offset": 0,
+    "total": 10
+  }
+}

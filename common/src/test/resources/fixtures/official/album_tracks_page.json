@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "artists": [
+        {
+          "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+          "name": "Billie Eilish"
+        }
+      ],
+      "duration_ms": 210000,
+      "explicit": false,
+      "id": "3eK4V9B9qE6v0cK7x2A6B4",
+      "is_local": false,
+      "name": "CHIHIRO",
+      "track_number": 3
+    },
+    {
+      "artists": [
+        {
+          "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+          "name": "Billie Eilish"
+        }
+      ],
+      "duration_ms": 234000,
+      "explicit": false,
+      "id": "4fK4V9B9qE6v0cK7x2A6B5",
+      "is_local": false,
+      "name": "BIRDS OF A FEATHER",
+      "track_number": 4
+    }
+  ],
+  "limit": 2,
+  "next": null,
+  "offset": 2,
+  "total": 10
+}

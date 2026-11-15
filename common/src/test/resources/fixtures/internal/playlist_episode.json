@@ -1,0 +1,59 @@
+{
+  "data": {
+    "playlistV2": {
+      "__typename": "Playlist",
+      "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "name": "Podcast Playlist",
+      "ownerV2": {
+        "data": {
+          "name": "Podcaster"
+        }
+      },
+      "images": {
+        "items": []
+      },
+      "content": {
+        "totalCount": 2,
+        "items": [
+          {
+            "itemV2": {
+              "__typename": "EpisodeResponseWrapper",
+              "data": {
+                "__typename": "Episode",
+                "uri": "spotify:episode:512dHlYrNzXuAZGQoConcw",
+                "name": "Special Episode",
+                "duration": {
+                  "totalMilliseconds": 1800000
+                }
+              }
+            }
+          },
+          {
+            "itemV2": {
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+                "name": "Never Gonna Give You Up",
+                "trackDuration": {
+                  "totalMilliseconds": 213573
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Rick Astley"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

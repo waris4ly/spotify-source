@@ -1,0 +1,83 @@
+{
+  "data": {
+    "podcastUnionV2": {
+      "__typename": "Podcast",
+      "uri": "spotify:show:1234567890123456789012",
+      "name": "Tech Horizons",
+      "publisher": {
+        "name": "Tech Media Inc"
+      },
+      "coverArt": {
+        "sources": [
+          {
+            "url": "https://i.scdn.co/image/ab6765630000ba8aa1b2c3d4e5f6",
+            "width": 640
+          }
+        ]
+      },
+      "episodesV2": {
+        "totalCount": 2,
+        "items": [
+          {
+            "entity": {
+              "data": {
+                "__typename": "Episode",
+                "id": "5125459801234567890123",
+                "uri": "spotify:episode:5125459801234567890123",
+                "name": "The Future of AI",
+                "duration": {
+                  "totalMilliseconds": 3600000
+                },
+                "podcastV2": {
+                  "data": {
+                    "name": "Tech Horizons"
+                  }
+                },
+                "coverArt": {
+                  "sources": [
+                    {
+                      "url": "https://i.scdn.co/image/ab6765630000ba8aa1b2c3d4e5f6",
+                      "width": 640
+                    }
+                  ]
+                },
+                "contentRating": {
+                  "label": "NONE"
+                }
+              }
+            }
+          },
+          {
+            "entity": {
+              "data": {
+                "__typename": "Episode",
+                "id": "5125459801234567890124",
+                "uri": "spotify:episode:5125459801234567890124",
+                "name": "Quantum Computing",
+                "duration": {
+                  "totalMilliseconds": 2700000
+                },
+                "podcastV2": {
+                  "data": {
+                    "name": "Tech Horizons"
+                  }
+                },
+                "coverArt": {
+                  "sources": [
+                    {
+                      "url": "https://i.scdn.co/image/ab6765630000ba8aa1b2c3d4e5f6",
+                      "width": 640
+                    }
+                  ]
+                },
+                "contentRating": {
+                  "label": "EXPLICIT"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

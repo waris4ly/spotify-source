@@ -1,0 +1,120 @@
+{
+  "data": {
+    "playlistV2": {
+      "__typename": "Playlist",
+      "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "name": "Today's Top Hits",
+      "ownerV2": {
+        "data": {
+          "__typename": "User",
+          "name": "Spotify"
+        }
+      },
+      "images": {
+        "items": [
+          {
+            "sources": [
+              {
+                "url": "https://i.scdn.co/image/ab67706f00000003f04528c743e20039ac4eff07",
+                "width": 640,
+                "height": 640
+              },
+              {
+                "url": "https://i.scdn.co/image/ab67706f00000002f04528c743e20039ac4eff07",
+                "width": 300,
+                "height": 300
+              }
+            ]
+          }
+        ]
+      },
+      "content": {
+        "totalCount": 50,
+        "items": [
+          {
+            "itemV2": {
+              "__typename": "TrackResponseWrapper",
+              "data": {
+                "__typename": "Track",
+                "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+                "name": "Never Gonna Give You Up",
+                "trackDuration": {
+                  "totalMilliseconds": 213573
+                },
+                "contentRating": {
+                  "label": "NONE"
+                },
+                "playability": {
+                  "playable": true
+                },
+                "artists": {
+                  "items": [
+                    {
+                      "profile": {
+                        "name": "Rick Astley"
+                      },
+                      "uri": "spotify:artist:0gxyHStUYeYToDxYgdnq0E"
+                    }
+                  ]
+                },
+                "albumOfTrack": {
+                  "name": "Whenever You Need Somebody",
+                  "coverArt": {
+                    "sources": [
+                      {
+                        "url": "https://i.scdn.co/image/ab67616d0000b2735755e164993798e0c9ef7d7a",
+                        "width": 640,
+                        "height": 640
+                      }
+                    ]
+                  }
+                },
+                "externalIds": {
+                  "isrc": "GBARL9300134"
+                }
+              }
+            }
+          },
+          {
+            "track": {
+              "__typename": "Track",
+              "uri": "spotify:track:7qiZfU4dY1lWllzX7mPBI3",
+              "name": "Shape of You",
+              "duration": {
+                "totalMilliseconds": 233712
+              },
+              "contentRating": {
+                "label": "NONE"
+              },
+              "playability": {
+                "playable": true
+              },
+              "artists": {
+                "items": [
+                  {
+                    "profile": {
+                      "name": "Ed Sheeran"
+                    },
+                    "uri": "spotify:artist:6eUKZXaKkcviH0Ku9w2n3V"
+                  }
+                ]
+              },
+              "albumOfTrack": {
+                "name": "Divide",
+                "coverArt": {
+                  "sources": [
+                    {
+                      "url": "https://i.scdn.co/image/ab67616d0000b273ba5db46f4b838ef6027e6f96",
+                      "width": 640,
+                      "height": 640
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

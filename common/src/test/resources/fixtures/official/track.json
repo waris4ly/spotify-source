@@ -1,0 +1,46 @@
+{
+  "album": {
+    "album_type": "single",
+    "artists": [
+      {
+        "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+        "name": "Billie Eilish"
+      }
+    ],
+    "id": "7aJuG4TFXa2hmE4z1yxc3n",
+    "images": [
+      {
+        "height": 640,
+        "url": "https://i.scdn.co/image/ab67616d0000b273d31267868dfd6ebfa77a6ed7",
+        "width": 640
+      },
+      {
+        "height": 300,
+        "url": "https://i.scdn.co/image/ab67616d00001e02d31267868dfd6ebfa77a6ed7",
+        "width": 300
+      },
+      {
+        "height": 64,
+        "url": "https://i.scdn.co/image/ab67616d00004851d31267868dfd6ebfa77a6ed7",
+        "width": 64
+      }
+    ],
+    "name": "ocean eyes",
+    "total_tracks": 1
+  },
+  "artists": [
+    {
+      "id": "6qqNVTkY8uBg9cP3Jd7DAH",
+      "name": "Billie Eilish"
+    }
+  ],
+  "duration_ms": 200379,
+  "explicit": false,
+  "external_ids": {
+    "isrc": "USUM71600787"
+  },
+  "id": "4eoOQgFQ0rLMKNP8KcUNWc",
+  "is_local": false,
+  "name": "ocean eyes",
+  "type": "track"
+}

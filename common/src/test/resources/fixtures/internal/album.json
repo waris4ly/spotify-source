@@ -1,0 +1,64 @@
+{
+  "data": {
+    "albumUnion": {
+      "__typename": "Album",
+      "uri": "spotify:album:4aawyAB9vmqN3uQ7FjRGTy",
+      "name": "Global Warming",
+      "coverArt": {
+        "sources": [
+          {
+            "url": "https://i.scdn.co/image/ab67616d0000b2734e5684725e1d528b94879201",
+            "width": 640,
+            "height": 640
+          }
+        ]
+      },
+      "artists": {
+        "items": [
+          {
+            "profile": {
+              "name": "Pitbull"
+            },
+            "uri": "spotify:artist:0TnOYISbd1XYRBk9myaseg"
+          }
+        ]
+      },
+      "tracksV2": {
+        "totalCount": 16,
+        "items": [
+          {
+            "track": {
+              "uri": "spotify:track:4cOdK2wGLETKBW3PvgPWqT",
+              "name": "Feel This Moment",
+              "trackDuration": {
+                "totalMilliseconds": 229560
+              },
+              "contentRating": {
+                "label": "NONE"
+              },
+              "playability": {
+                "playable": true
+              },
+              "artists": {
+                "items": [
+                  {
+                    "profile": {
+                      "name": "Pitbull"
+                    },
+                    "uri": "spotify:artist:0TnOYISbd1XYRBk9myaseg"
+                  },
+                  {
+                    "profile": {
+                      "name": "Christina Aguilera"
+                    },
+                    "uri": "spotify:artist:1l7ZsJRRS8rudoaWOB6QKH"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
