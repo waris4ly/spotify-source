@@ -30,23 +30,11 @@ public data class PluginSettings(
     var metadataCacheMinutes: Int = 30,
     var mirrorCacheMinutes: Int = 360,
     var queryHashes: Map<String, String> = emptyMap(),
+    var lyrics: Boolean = true,
+    var lyricsProviders: List<String> = listOf("spotify", "lrclib"),
+    var lyricsCacheMinutes: Int = 720,
+    var lyricsMissCacheMinutes: Int = 30,
 ) {
-    // validate configuration values early to fail fast on invalid yaml settings
-    init {
-        require(searchLimit > 0) { "searchLimit must be greater than 0" }
-        require(playlistLoadLimit > 0) { "playlistLoadLimit must be greater than 0" }
-        require(albumLoadLimit > 0) { "albumLoadLimit must be greater than 0" }
-        require(showLoadLimit > 0) { "showLoadLimit must be greater than 0" }
-        require(recommendationLimit > 0) { "recommendationLimit must be greater than 0" }
-        require(requestTimeoutSeconds > 0) { "requestTimeoutSeconds must be greater than 0" }
-        require(mirrorProviders.isNotEmpty()) { "mirrorProviders must not be empty" }
-        require(mirrorDurationToleranceMs >= 0) {
-            "mirrorDurationToleranceMs cannot be negative"
-        }
-        require(metadataCacheMinutes >= 0) { "metadataCacheMinutes cannot be negative" }
-        require(mirrorCacheMinutes >= 0) { "mirrorCacheMinutes cannot be negative" }
-    }
-
     internal fun toOptions(): SpotifyOptions =
         SpotifyOptions(
             clientId = clientId,
@@ -69,5 +57,29 @@ public data class PluginSettings(
             metadataCacheMinutes = metadataCacheMinutes,
             mirrorCacheMinutes = mirrorCacheMinutes,
             queryHashes = queryHashes,
+            lyrics = lyrics,
+            lyricsProviders = lyricsProviders,
+            lyricsCacheMinutes = lyricsCacheMinutes,
+            lyricsMissCacheMinutes = lyricsMissCacheMinutes,
         )
+
+    override fun toString(): String {
+        val secretMask = if (clientSecret.isBlank()) "<unset>" else "***"
+        val cookieMask = if (accountCookie.isBlank()) "<unset>" else "***"
+        val anonUrlMask = if (anonymousTokenUrl.isBlank()) "<unset>" else "***"
+        return "PluginSettings(enabled=$enabled, clientId=$clientId, clientSecret=$secretMask, " +
+            "accountCookie=$cookieMask, anonymousTokenUrl=$anonUrlMask, " +
+            "countryCode=$countryCode, internalBackend=$internalBackend, " +
+            "searchLimit=$searchLimit, playlistLoadLimit=$playlistLoadLimit, " +
+            "albumLoadLimit=$albumLoadLimit, showLoadLimit=$showLoadLimit, " +
+            "allowLocalFiles=$allowLocalFiles, extractColors=$extractColors, " +
+            "canvas=$canvas, recommendationLimit=$recommendationLimit, " +
+            "requestTimeoutSeconds=$requestTimeoutSeconds, mirrorProviders=$mirrorProviders, " +
+            "mirrorDurationToleranceMs=$mirrorDurationToleranceMs, " +
+            "metadataCacheMinutes=$metadataCacheMinutes, " +
+            "mirrorCacheMinutes=$mirrorCacheMinutes, queryHashes=$queryHashes, " +
+            "lyrics=$lyrics, lyricsProviders=$lyricsProviders, " +
+            "lyricsCacheMinutes=$lyricsCacheMinutes, " +
+            "lyricsMissCacheMinutes=$lyricsMissCacheMinutes)"
+    }
 }

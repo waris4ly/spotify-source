@@ -5,7 +5,9 @@ import dev.waris.spotify.error.SpotifyException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -92,13 +94,42 @@ class TokenManagerTest {
             AccessToken(
                 value = "token-old",
                 expiresAt = TimeSource.Monotonic.markNow() + 3.minutes,
-                expiresInSeconds = 180,
+                expiresInSeconds = 3600,
             )
         manager.setToken(TokenKind.CLIENT, expiringSoon)
 
         val token = manager.getToken(TokenKind.CLIENT)
         assertEquals("token-fresh", token.value)
         assertEquals(1, server.requestCount)
+        manager.close()
+    }
+
+    @Test
+    fun token_shortLivedTokenNotRefreshedImmediatelyAfterCreation() {
+        val provider =
+            ClientCredentialsProvider(
+                clientId = "test-client-id",
+                clientSecret = "test-client-secret",
+                httpInterfaceManager = httpInterfaceManager,
+                tokenUrl = server.url("/api/token").toString(),
+            )
+        val manager =
+            TokenManager(
+                providers = mapOf(TokenKind.CLIENT to provider),
+                refreshMargin = 5.minutes,
+            )
+
+        val freshShortLived =
+            AccessToken(
+                value = "token-short",
+                expiresAt = TimeSource.Monotonic.markNow() + 120.seconds,
+                expiresInSeconds = 120,
+            )
+        manager.setToken(TokenKind.CLIENT, freshShortLived)
+
+        val token = manager.getToken(TokenKind.CLIENT)
+        assertEquals("token-short", token.value)
+        assertEquals(0, server.requestCount)
         manager.close()
     }
 
@@ -171,5 +202,70 @@ class TokenManagerTest {
             }
         assertTrue(ex.isQuotaExceeded)
         manager.close()
+    }
+
+    @Test
+    fun token_twoKindsRefreshConcurrentlyWhileOneFetchBlocks() {
+        val clientStartedLatch = CountDownLatch(1)
+        val clientBlockLatch = CountDownLatch(1)
+
+        val clientProvider =
+            object : TokenProvider {
+                override val kind: TokenKind = TokenKind.CLIENT
+                override val isCoolingDown: Boolean = false
+
+                override fun coolDown(duration: kotlin.time.Duration) {}
+
+                override fun fetchToken(): AccessToken {
+                    clientStartedLatch.countDown()
+                    clientBlockLatch.await(5, TimeUnit.SECONDS)
+                    return AccessToken("client-token", TimeSource.Monotonic.markNow() + 1.hours)
+                }
+            }
+
+        val accountProvider =
+            object : TokenProvider {
+                override val kind: TokenKind = TokenKind.ACCOUNT
+                override val isCoolingDown: Boolean = false
+
+                override fun coolDown(duration: kotlin.time.Duration) {}
+
+                override fun fetchToken(): AccessToken =
+                    AccessToken("account-token", TimeSource.Monotonic.markNow() + 1.hours)
+            }
+
+        val manager =
+            TokenManager(
+                mapOf(
+                    TokenKind.CLIENT to clientProvider,
+                    TokenKind.ACCOUNT to accountProvider,
+                ),
+            )
+
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val clientFuture =
+                executor.submit<AccessToken> {
+                    manager.getToken(TokenKind.CLIENT)
+                }
+
+            assertTrue(clientStartedLatch.await(2, TimeUnit.SECONDS))
+
+            val accountFuture =
+                executor.submit<AccessToken> {
+                    manager.getToken(TokenKind.ACCOUNT)
+                }
+
+            val accountToken = accountFuture.get(1, TimeUnit.SECONDS)
+            assertEquals("account-token", accountToken.value)
+
+            clientBlockLatch.countDown()
+            val clientToken = clientFuture.get(2, TimeUnit.SECONDS)
+            assertEquals("client-token", clientToken.value)
+        } finally {
+            clientBlockLatch.countDown()
+            executor.shutdownNow()
+            manager.close()
+        }
     }
 }

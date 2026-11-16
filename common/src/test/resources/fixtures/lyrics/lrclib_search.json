@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "name": "Test Track",
+    "trackName": "Test Track",
+    "artistName": "Test Artist",
+    "albumName": "Test Album",
+    "duration": 210,
+    "instrumental": false,
+    "plainLyrics": "First line\nSecond line\nThird line",
+    "syncedLyrics": "[00:12.50] First synced line\n[00:18.00] Second synced line\n[00:25.75] Third synced line"
+  },
+  {
+    "id": 2,
+    "name": "Instrumental Track",
+    "trackName": "Instrumental Track",
+    "artistName": "Test Artist",
+    "albumName": "Test Album",
+    "duration": 210,
+    "instrumental": true,
+    "plainLyrics": null,
+    "syncedLyrics": null
+  }
+]

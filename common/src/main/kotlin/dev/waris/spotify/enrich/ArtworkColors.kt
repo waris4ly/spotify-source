@@ -14,14 +14,14 @@ internal data class ExtractedColors(
     val raw: String? = null,
 )
 
-internal class ArtworkColors(
+internal open class ArtworkColors(
     private val http: SpotifyHttp,
     private val persistedQueries: PersistedQueries = PersistedQueries(),
     private val endpointUrl: String = DEFAULT_ENDPOINT_URL,
 ) {
     private val log = LoggerFactory.getLogger(ArtworkColors::class.java)
 
-    fun fetchColors(artworkUrl: String?): ExtractedColors? {
+    open fun fetchColors(artworkUrl: String?): ExtractedColors? {
         if (artworkUrl.isNullOrBlank()) {
             return null
         }

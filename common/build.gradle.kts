@@ -41,9 +41,7 @@ dependencies {
     testImplementation(libs.lavaplayer)
     testImplementation(libs.mockwebserver3)
     testImplementation(libs.mockwebserver3.junit5)
-    testImplementation(
-        "dev.lavalink.youtube:common:e41dd95f8bd134b51e75080fb28cc805fecb431a-SNAPSHOT",
-    )
+    testImplementation(libs.lavalink.youtube)
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly("org.slf4j:slf4j-simple:${libs.versions.slf4j.get()}")
 }

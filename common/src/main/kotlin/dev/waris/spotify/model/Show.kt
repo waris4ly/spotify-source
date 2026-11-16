@@ -8,4 +8,5 @@ internal data class Show(
     val totalEpisodes: Int = episodes.size,
     val artworkUrl: String? = null,
     val isAudiobook: Boolean = false,
+    val truncated: Boolean = false,
 )

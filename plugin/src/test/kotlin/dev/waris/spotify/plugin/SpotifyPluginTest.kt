@@ -1,5 +1,6 @@
 package dev.waris.spotify.plugin
 
+import com.github.topi314.lavalyrics.LyricsManager
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager
 import com.sedmelluq.discord.lavaplayer.source.AudioSourceManager
 import com.sedmelluq.discord.lavaplayer.track.AudioItem
@@ -10,6 +11,7 @@ import dev.waris.spotify.SpotifyAudioSourceManager
 import java.io.DataInput
 import java.io.DataOutput
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -46,6 +48,7 @@ class SpotifyPluginTest {
             val registered =
                 manager.sourceManagers.filterIsInstance<SpotifyAudioSourceManager>()
             assertEquals(1, registered.size)
+            assertEquals(manager, registered[0].playerManager)
         } finally {
             manager.shutdown()
         }
@@ -101,6 +104,76 @@ class SpotifyPluginTest {
             assertEquals(2, spotifyManagers.size)
         } finally {
             manager.shutdown()
+        }
+    }
+
+    @Test
+    fun configure_withInvalidSettings_failsStartupWithClearMessage() {
+        val settings = PluginSettings().apply { searchLimit = -5 }
+        val plugin = SpotifyPlugin(settings)
+        val manager = DefaultAudioPlayerManager()
+        try {
+            val ex =
+                assertThrows(IllegalArgumentException::class.java) {
+                    plugin.configure(manager)
+                }
+            assertTrue(ex.message?.contains("searchLimit") == true)
+        } finally {
+            manager.shutdown()
+        }
+    }
+
+    @Test
+    fun configure_registersSpotifyLyricsManager_whenEnabled() {
+        val plugin = SpotifyPlugin(PluginSettings(lyrics = true))
+        val lyricsManager = LyricsManager()
+        try {
+            plugin.configure(lyricsManager)
+            val registered =
+                lyricsManager.lyricsManagers.filterIsInstance<SpotifyLyricsManager>()
+            assertEquals(1, registered.size)
+        } finally {
+            lyricsManager.shutdown()
+        }
+    }
+
+    @Test
+    fun configure_doesNotRegisterLyricsManager_whenLyricsDisabled() {
+        val plugin = SpotifyPlugin(PluginSettings(lyrics = false))
+        val lyricsManager = LyricsManager()
+        try {
+            plugin.configure(lyricsManager)
+            val registered =
+                lyricsManager.lyricsManagers.filterIsInstance<SpotifyLyricsManager>()
+            assertTrue(registered.isEmpty())
+        } finally {
+            lyricsManager.shutdown()
+        }
+    }
+
+    @Test
+    fun configure_sharesLazySourceBetweenAudioPlayerManagerAndLyricsManager() {
+        val plugin = SpotifyPlugin(PluginSettings(lyrics = true))
+        val playerManager = DefaultAudioPlayerManager()
+        val lyricsManager = LyricsManager()
+        try {
+            plugin.configure(lyricsManager)
+            plugin.configure(playerManager)
+
+            val source =
+                playerManager.sourceManagers.filterIsInstance<SpotifyAudioSourceManager>().first()
+            val lyricsSourceManager =
+                lyricsManager.lyricsManagers.filterIsInstance<SpotifyLyricsManager>().first()
+
+            val field =
+                SpotifyLyricsManager::class.java.getDeclaredField("source").apply {
+                    isAccessible = true
+                }
+            val underlyingSource = field.get(lyricsSourceManager)
+            assertEquals(source, underlyingSource)
+        } finally {
+            playerManager.shutdown()
+            lyricsManager.shutdown()
         }
     }
 }

@@ -9,4 +9,9 @@ internal open class SpotifyException(
         val retryAfterSeconds: Long? = null,
         val isQuotaExceeded: Boolean = false,
     ) : SpotifyException(message)
+
+    class QueryRejected(
+        val operationName: String,
+        message: String = "persisted query not found for operation $operationName",
+    ) : SpotifyException(message)
 }

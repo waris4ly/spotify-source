@@ -7,4 +7,5 @@ internal data class Playlist(
     val tracks: List<Track>,
     val totalTracks: Int = tracks.size,
     val artworkUrl: String? = null,
+    val truncated: Boolean = false,
 )

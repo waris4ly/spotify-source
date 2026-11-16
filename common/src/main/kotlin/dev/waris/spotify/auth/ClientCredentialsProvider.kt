@@ -5,10 +5,6 @@ import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager
 import dev.waris.spotify.error.SpotifyException
 import java.nio.charset.StandardCharsets
 import kotlin.io.encoding.Base64
-import kotlin.time.ComparableTimeMark
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.StringEntity
 import org.slf4j.LoggerFactory
@@ -18,19 +14,10 @@ internal class ClientCredentialsProvider(
     private val clientSecret: String,
     private val httpInterfaceManager: HttpInterfaceManager,
     private val tokenUrl: String = DEFAULT_TOKEN_URL,
-) : TokenProvider {
+) : BaseTokenProvider() {
     private val log = LoggerFactory.getLogger(ClientCredentialsProvider::class.java)
 
     override val kind: TokenKind = TokenKind.CLIENT
-
-    private var coolDownUntil: ComparableTimeMark? = null
-
-    override val isCoolingDown: Boolean
-        get() = coolDownUntil?.let { !it.hasPassedNow() } ?: false
-
-    override fun coolDown(duration: Duration) {
-        coolDownUntil = TimeSource.Monotonic.markNow() + duration
-    }
 
     override fun fetchToken(): AccessToken {
         if (clientId.isEmpty() || clientSecret.isEmpty()) {
@@ -47,23 +34,24 @@ internal class ClientCredentialsProvider(
                 entity = StringEntity("grant_type=client_credentials", StandardCharsets.UTF_8)
             }
 
-        val response =
+        val (statusCode, content, retryAfter) =
             try {
                 httpInterfaceManager.getInterface().use { http ->
-                    http.execute(request)
+                    http.execute(request).use { response ->
+                        val code = response.statusLine.statusCode
+                        val retry = response.getFirstHeader("Retry-After")?.value?.toLongOrNull()
+                        val parsed =
+                            response.entity?.content?.use {
+                                JsonBrowser.parse(it)
+                            } ?: JsonBrowser.NULL_BROWSER
+                        Triple(code, parsed, retry)
+                    }
                 }
             } catch (e: Exception) {
                 throw SpotifyException("token request failed", e)
             }
 
-        val statusCode = response.statusLine.statusCode
-        val content =
-            response.entity?.content?.use {
-                JsonBrowser.parse(it)
-            } ?: JsonBrowser.NULL_BROWSER
-
         if (statusCode == 429) {
-            val retryAfter = response.getFirstHeader("Retry-After")?.value?.toLongOrNull()
             val reason =
                 content.get("error").get("reason").text()
                     ?: content.get("reason").text()
@@ -84,16 +72,7 @@ internal class ClientCredentialsProvider(
             throw SpotifyException("authentication failed: $message")
         }
 
-        val token =
-            content.get("access_token").text()
-                ?: throw SpotifyException("token response missing access_token")
-        val expiresIn = content.get("expires_in").asLong(3600)
-        val expiresAt = TimeSource.Monotonic.markNow() + expiresIn.seconds
-        return AccessToken(
-            value = token,
-            expiresAt = expiresAt,
-            expiresInSeconds = expiresIn,
-        )
+        return parseAccessToken(content)
     }
 
     companion object {

@@ -1,5 +1,6 @@
 package dev.waris.spotify.api.internal
 
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager
 import dev.waris.spotify.SpotifyOptions
@@ -203,5 +204,27 @@ class InternalApiTest {
         assertEquals("Never Gonna Give You Up", track?.title)
         assertEquals("Rick Astley", track?.author)
         assertEquals(213573, track?.durationMs)
+    }
+
+    @Test
+    fun search_queryWithSpecialAndControlCharactersProducesValidJson() {
+        val query = "hello\nworld\t\"test\"\u0001foo"
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "application/json")
+                .body("""{"data": {"searchV2": {"tracksV2": {"items": []}}}}""")
+                .build(),
+        )
+
+        api.search(query, limit = 10, offset = 0)
+
+        val recorded = server.takeRequest()
+        val requestBody = recorded.body?.utf8() ?: ""
+        val parsedJson = JsonBrowser.parse(requestBody)
+        assertFalse(parsedJson.isNull())
+        val searchTerm = parsedJson.get("variables").get("searchTerm").text()
+        assertEquals(query, searchTerm)
     }
 }

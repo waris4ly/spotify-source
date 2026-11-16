@@ -7,6 +7,7 @@ internal data class Album(
     val tracks: List<Track>,
     val totalTracks: Int = tracks.size,
     val artworkUrl: String? = null,
+    val truncated: Boolean = false,
 ) {
     val author: String
         get() = artists.joinToString(", ") { it.name }.ifEmpty { "Unknown" }

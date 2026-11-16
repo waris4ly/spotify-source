@@ -149,4 +149,31 @@ class ShortLinkResolverTest {
         val resolved = testResolver.resolve(server.url("/page").toString())
         assertEquals(target, resolved)
     }
+
+    @Test
+    fun resolve_bodyBeyond256KbIsNotRead() {
+        val target = "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"
+        val largePadding = "A".repeat(270 * 1024)
+        val suffix = """<meta property="og:url" content="$target"/>"""
+        val html = largePadding + suffix
+
+        val landingUrl = server.url("/too-large").toString()
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "text/html")
+                .body(html)
+                .build(),
+        )
+
+        val testResolver =
+            ShortLinkResolver(
+                httpInterfaceManager = HttpClientTools.createDefaultThreadLocalManager(),
+                pattern = Regex(".*"),
+            )
+
+        val resolved = testResolver.resolve(landingUrl)
+        assertEquals(landingUrl, resolved)
+    }
 }

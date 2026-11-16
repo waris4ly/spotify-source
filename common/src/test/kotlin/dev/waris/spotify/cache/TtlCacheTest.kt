@@ -79,4 +79,49 @@ class TtlCacheTest {
 
         assertEquals("updated", cache.get("k1"))
     }
+
+    @Test
+    fun put_respectsMaxSizeCap() {
+        val smallCache = TtlCache<String, String>(timeSource, maxSize = 5)
+        for (i in 1..10) {
+            smallCache.put("k$i", "v$i", 10.minutes)
+        }
+        assertEquals(5, smallCache.size)
+    }
+
+    @Test
+    fun put_prunesExpiredEntriesAfterEnoughPuts() {
+        val pruneCache = TtlCache<String, String>(timeSource, maxSize = 100)
+        pruneCache.put("exp1", "v1", 1.minutes)
+        pruneCache.put("exp2", "v2", 1.minutes)
+
+        timeSource += 2.minutes
+        // expired entries are still in map until prune
+        assertEquals(2, pruneCache.size)
+
+        // put 50 new items to trigger the prune interval
+        for (i in 1..50) {
+            pruneCache.put("key$i", "val$i", 10.minutes)
+        }
+
+        // expired entries should have been pruned inside put
+        assertEquals(50, pruneCache.size)
+        assertNull(pruneCache.get("exp1"))
+        assertNull(pruneCache.get("exp2"))
+    }
+
+    @Test
+    fun eviction_removesEntryThatExpiresFirst() {
+        val smallCache = TtlCache<String, String>(timeSource, maxSize = 2)
+        smallCache.put("long", "v_long", 10.minutes)
+        smallCache.put("short", "v_short", 2.minutes)
+
+        // inserting 3rd item when cap is 2 triggers eviction of earliest expiring ("short")
+        smallCache.put("new", "v_new", 5.minutes)
+
+        assertEquals(2, smallCache.size)
+        assertNull(smallCache.get("short"))
+        assertEquals("v_long", smallCache.get("long"))
+        assertEquals("v_new", smallCache.get("new"))
+    }
 }

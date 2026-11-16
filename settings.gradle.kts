@@ -6,11 +6,11 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode = RepositoriesMode.PREFER_SETTINGS
     repositories {
         mavenCentral()
         maven("https://maven.lavalink.dev/releases")
         maven("https://maven.lavalink.dev/snapshots")
+        maven("https://maven.topi.wtf/releases")
         maven("https://jitpack.io")
     }
 }

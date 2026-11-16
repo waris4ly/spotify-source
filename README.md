@@ -16,6 +16,8 @@ Supports Spotify tracks, albums, playlists, artists, podcasts, episodes, and aud
   - Supported URL formats, short links, and search prefixes (`spsearch:`, `spsuggest:`, `sprec:`, `spsimilar:`).
 - [Track Plugin Info](#track-plugin-info)
   - Extended metadata payloads including artwork colors, canvas video loops, and ISRC codes.
+- [Lyrics](#lyrics)
+  - LavaLyrics API integration, supported providers (Spotify, LRCLIB), and standalone Lavaplayer usage.
 - [Important Notes](#important-notes)
   - Operational details on LavaSrc conflict prevention, playable audio mirrors, and Spotify Premium.
 - [Issues and Support](#issues-and-support)
@@ -86,6 +88,10 @@ plugins:
       - 'ytsearch:"%isrc%"' # first priority: exact ISRC code match
       - "ytsearch:%query%" # fallback: title and artist search
     queryHashes: {} # optional overrides for Spotify internal GraphQL operation sha256 hashes
+    lyrics: true # serve lyrics through the LavaLyrics API
+    lyricsProviders: ["spotify", "lrclib"] # priority order: spotify (requires accountCookie), lrclib
+    lyricsCacheMinutes: 720 # how long found lyrics stay cached in memory
+    lyricsMissCacheMinutes: 30 # how long missing lyrics responses stay cached
 ```
 
 ---
@@ -240,6 +246,89 @@ Extended metadata delivered in Lavalink's `pluginInfo` payload:
   "author": "Playlist Owner",
   "artworkUrl": "https://i.scdn.co/image/...",
   "totalTracks": 42
+}
+```
+
+### Lyrics Metadata
+
+```json
+{
+  "syncType": "line",
+  "language": "en",
+  "rightToLeft": false
+}
+```
+
+---
+
+## Lyrics
+
+spotify-source integrates directly with the [LavaLyrics](https://github.com/topi314/LavaLyrics) plugin API.
+
+### Lavalink Setup
+
+To serve lyrics via Lavalink v4 REST endpoints and websocket events, install `lavalyrics-plugin` alongside `spotify-source` in your server configuration:
+
+```yaml
+lavalink:
+  plugins:
+    - dependency: "com.github.topi314.lavalyrics:lavalyrics-plugin:1.0.0"
+    - dependency: "dev.waris.spotify:spotify-plugin:x.x.x"
+
+plugins:
+  lavasrc:
+    sources:
+      spotify: false
+    lyrics-sources:
+      spotify: false # ensure LavaSrc lyrics are disabled to avoid duplicate registration
+  lavalyrics:
+    sources:
+      - spotify
+  spotify:
+    accountCookie: "<sp_dc>" # optional: required for Spotify color-lyrics
+    lyrics: true
+    lyricsProviders: ["spotify", "lrclib"]
+    lyricsCacheMinutes: 720
+    lyricsMissCacheMinutes: 30
+```
+
+### Providers
+
+1. **Spotify (`spotify`):** Calls Spotify's color-lyrics service via `accountCookie` (`sp_dc`). Returns timed, line-synced lyrics with start timestamps and line durations.
+2. **LRCLIB (`lrclib`):** Fallback provider querying `lrclib.net`. Requires zero cookies or authentication. Matches tracks within duration tolerance and parses synced LRC timestamps (`[mm:ss.xx]`), falling back to plain lyrics.
+
+### Standalone Lavaplayer Usage
+
+Standalone Lavaplayer applications can load lyrics directly without Lavalink or LavaLyrics:
+
+**Kotlin:**
+```kotlin
+val track = playerManager.loadItem(...) as AudioTrack
+val lyrics = spotifySourceManager.loadLyrics(track)
+
+if (lyrics != null) {
+    println("Provider: ${lyrics.providerLabel ?: lyrics.provider}")
+    println("Sync type: ${lyrics.sync}") // LINE or NONE
+    lyrics.lines.forEach { line ->
+        println("[${line.startMs}ms - ${line.endMs}ms] ${line.text}")
+    }
+}
+```
+
+**Java:**
+```java
+AudioTrack track = (AudioTrack) playerManager.loadItem(...);
+Lyrics lyrics = spotifySourceManager.loadLyrics(track);
+
+if (lyrics != null) {
+    String provider = lyrics.getProviderLabel() != null
+        ? lyrics.getProviderLabel()
+        : lyrics.getProvider();
+    System.out.println("Provider: " + provider);
+    System.out.println("Sync type: " + lyrics.getSync()); // LINE or NONE
+    for (LyricsLine line : lyrics.getLines()) {
+        System.out.println("[" + line.getStartMs() + "ms - " + line.getEndMs() + "ms] " + line.getText());
+    }
 }
 ```
 

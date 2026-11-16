@@ -74,6 +74,7 @@ internal class AudioItemFactory {
             author = album.author,
             artworkUrl = album.artworkUrl,
             totalTracks = album.totalTracks,
+            truncated = album.truncated,
         )
     }
 
@@ -92,6 +93,7 @@ internal class AudioItemFactory {
             author = playlist.owner,
             artworkUrl = playlist.artworkUrl,
             totalTracks = playlist.totalTracks,
+            truncated = playlist.truncated,
         )
     }
 
@@ -129,6 +131,7 @@ internal class AudioItemFactory {
             author = show.publisher,
             artworkUrl = show.artworkUrl,
             totalTracks = show.totalEpisodes,
+            truncated = show.truncated,
         )
     }
 

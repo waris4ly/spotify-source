@@ -2,10 +2,7 @@ package dev.waris.spotify.auth
 
 import dev.waris.spotify.error.SpotifyException
 import java.io.Closeable
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import org.slf4j.LoggerFactory
@@ -17,14 +14,7 @@ internal class TokenManager(
     private val log = LoggerFactory.getLogger(TokenManager::class.java)
 
     private val tokens = ConcurrentHashMap<TokenKind, AccessToken>()
-    private val refreshing = ConcurrentHashMap<TokenKind, CompletableFuture<AccessToken>>()
-
-    private val executor =
-        Executors.newSingleThreadScheduledExecutor { runnable ->
-            Thread(runnable, "spotify-token-manager").apply {
-                isDaemon = true
-            }
-        }
+    private val locks = TokenKind.entries.associateWith { Any() }
 
     fun getToken(kind: TokenKind): AccessToken {
         val provider =
@@ -71,41 +61,27 @@ internal class TokenManager(
     private fun refresh(
         kind: TokenKind,
         provider: TokenProvider,
-    ): AccessToken {
-        // share one refresh future across concurrent calls
-        val future =
-            refreshing.compute(kind) { _, existing ->
-                if (existing != null && !existing.isDone) {
-                    existing
-                } else {
-                    CompletableFuture.supplyAsync(
-                        {
-                            val token = provider.fetchToken()
-                            tokens[kind] = token
-                            log.info("token refreshed expires_in={}", token.expiresInSeconds)
-                            token
-                        },
-                        executor,
-                    )
-                }
-            } ?: throw SpotifyException("failed to initiate refresh for $kind")
-
-        return try {
-            future.join()
-        } catch (e: CompletionException) {
-            val cause = e.cause ?: e
-            if (cause is SpotifyException) {
-                throw cause
+    ): AccessToken =
+        synchronized(locks.getValue(kind)) {
+            // another caller may have refreshed while we waited on the lock
+            val cached = tokens[kind]
+            if (cached != null && !cached.isExpiring(refreshMargin)) {
+                return cached
             }
-            throw SpotifyException("failed to refresh token for $kind", cause)
-        } finally {
-            refreshing.remove(kind, future)
+            val token =
+                try {
+                    provider.fetchToken()
+                } catch (e: SpotifyException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw SpotifyException("failed to refresh token for $kind", e)
+                }
+            tokens[kind] = token
+            log.info("token refreshed expires_in={}", token.expiresInSeconds)
+            token
         }
-    }
 
     override fun close() {
-        executor.shutdownNow()
         tokens.clear()
-        refreshing.clear()
     }
 }

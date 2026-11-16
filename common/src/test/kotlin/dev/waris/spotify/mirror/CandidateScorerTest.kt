@@ -241,4 +241,139 @@ class CandidateScorerTest {
 
         assertNull(best)
     }
+
+    @Test
+    fun findBest_nonLatinTitles_matchesCorrectCandidateAndRejectsDifferent() {
+        val devanagariTarget =
+            AudioTrackInfo(
+                "तुम ही हो",
+                "Arijit Singh",
+                262000L,
+                "t_dev",
+                false,
+                "https://open.spotify.com/track/t_dev",
+                null,
+                null,
+            )
+        val devanagariCandidate =
+            mockCandidate(
+                title = "Arijit Singh - तुम ही हो",
+                author = "Arijit Singh",
+                length = 261000L,
+            )
+        val devanagariWrong =
+            mockCandidate(
+                title = "Arijit Singh - केसरिया",
+                author = "Arijit Singh",
+                length = 261000L,
+            )
+
+        val devanagariBest =
+            scorer.findBest(devanagariTarget, listOf(devanagariWrong, devanagariCandidate))
+        assertNotNull(devanagariBest)
+        assertEquals(devanagariCandidate.info.title, devanagariBest?.info?.title)
+
+        val japaneseTarget =
+            AudioTrackInfo(
+                "夜に駆ける",
+                "YOASOBI",
+                261000L,
+                "t_jp",
+                false,
+                "https://open.spotify.com/track/t_jp",
+                null,
+                null,
+            )
+        val japaneseCandidate =
+            mockCandidate(
+                title = "YOASOBI - 夜に駆ける",
+                author = "YOASOBI",
+                length = 260000L,
+            )
+        val japaneseWrong =
+            mockCandidate(
+                title = "YOASOBI - 群青",
+                author = "YOASOBI",
+                length = 260000L,
+            )
+
+        val japaneseBest =
+            scorer.findBest(japaneseTarget, listOf(japaneseWrong, japaneseCandidate))
+        assertNotNull(japaneseBest)
+        assertEquals(japaneseCandidate.info.title, japaneseBest?.info?.title)
+
+        val differentNonLatinCandidate =
+            mockCandidate(
+                title = "群青",
+                author = "Different Artist",
+                length = 260000L,
+            )
+        val rejectedBest = scorer.findBest(japaneseTarget, listOf(differentNonLatinCandidate))
+        assertNull(rejectedBest)
+    }
+
+    @Test
+    fun score_penaltyWordsMatchWholeTokensOrPhrases() {
+        val oliverTarget =
+            AudioTrackInfo(
+                "Life Goes On",
+                "Oliver Tree",
+                161000L,
+                "t_oliver",
+                false,
+                "https://open.spotify.com/track/t_oliver",
+                null,
+                null,
+            )
+        val oliverCandidate =
+            mockCandidate(
+                title = "Oliver Tree - Life Goes On",
+                author = "Oliver Tree",
+                length = 161000L,
+            )
+        val oliverLiveCandidate =
+            mockCandidate(
+                title = "Oliver Tree - Life Goes On (Live)",
+                author = "Oliver Tree",
+                length = 161000L,
+            )
+
+        val oliverScore = scorer.score(oliverTarget, oliverCandidate)
+        val oliverLiveScore = scorer.score(oliverTarget, oliverLiveCandidate)
+
+        // oliver must not trigger live penalty
+        assertTrue(oliverScore >= 200.0)
+        // live candidate must be penalized by at least 100
+        assertTrue(oliverScore - oliverLiveScore >= 100.0)
+
+        val discoverTarget =
+            AudioTrackInfo(
+                "Discover",
+                "Some Artist",
+                180000L,
+                "t_disc",
+                false,
+                "https://open.spotify.com/track/t_disc",
+                null,
+                null,
+            )
+        val discoverCandidate =
+            mockCandidate(
+                title = "Some Artist - Discover",
+                author = "Some Artist",
+                length = 180000L,
+            )
+        val discoverScore = scorer.score(discoverTarget, discoverCandidate)
+        // discover must not trigger cover penalty
+        assertTrue(discoverScore >= 200.0)
+
+        val spedUpCandidate =
+            mockCandidate(
+                title = "Oliver Tree - Life Goes On (Sped Up)",
+                author = "Oliver Tree",
+                length = 161000L,
+            )
+        val spedUpScore = scorer.score(oliverTarget, spedUpCandidate)
+        assertTrue(oliverScore - spedUpScore >= 100.0)
+    }
 }

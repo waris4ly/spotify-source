@@ -61,19 +61,18 @@ internal class InternalApi(
         limit: Int,
         offset: Int,
     ): List<Track> {
-        val sanitizedQuery = escapeJson(query)
         val variables =
-            """
-            {
-              "searchTerm": "$sanitizedQuery",
-              "offset": $offset,
-              "limit": $limit,
-              "numberOfTopResults": 5,
-              "includeAudiobooks": false,
-              "includeArtistHasConcertsField": false,
-              "includePreReleases": false
-            }
-            """.trimIndent()
+            JsonBrowser
+                .newMap()
+                .apply {
+                    put("searchTerm", query)
+                    put("offset", offset)
+                    put("limit", limit)
+                    put("numberOfTopResults", 5)
+                    put("includeAudiobooks", false)
+                    put("includeArtistHasConcertsField", false)
+                    put("includePreReleases", false)
+                }.format()
         val json = postQuery(PersistedQueries.SEARCH_DESKTOP, variables)
         return parser.parseSearch(json)
     }
@@ -107,6 +106,7 @@ internal class InternalApi(
 
         val allTracks = album.tracks.toMutableList()
         var offset = allTracks.size
+        var truncated = false
         // page through subsequent items until reaching target limit or end of collection
         while (allTracks.size < album.totalTracks && allTracks.size < limit) {
             val nextPageLimit = min(300, limit - allTracks.size)
@@ -129,9 +129,14 @@ internal class InternalApi(
                         allTracks.size,
                         album.totalTracks,
                     )
+                    truncated = true
                     break
                 }
-            val pageAlbum = parser.parseAlbum(pageJson, nextPageLimit) ?: break
+            val pageAlbum =
+                parser.parseAlbum(pageJson, nextPageLimit) ?: run {
+                    truncated = true
+                    break
+                }
             if (pageAlbum.tracks.isEmpty()) {
                 break
             }
@@ -139,7 +144,7 @@ internal class InternalApi(
             offset += pageAlbum.tracks.size
         }
 
-        return album.copy(tracks = allTracks)
+        return album.copy(tracks = allTracks, truncated = truncated)
     }
 
     override fun getPlaylist(
@@ -165,6 +170,7 @@ internal class InternalApi(
 
         val allTracks = playlist.tracks.toMutableList()
         var offset = allTracks.size
+        var truncated = false
         while (allTracks.size < playlist.totalTracks && allTracks.size < limit) {
             val nextPageLimit = min(100, limit - allTracks.size)
             val nextVariables =
@@ -186,6 +192,7 @@ internal class InternalApi(
                         allTracks.size,
                         playlist.totalTracks,
                     )
+                    truncated = true
                     break
                 }
             val pageTracks =
@@ -201,7 +208,7 @@ internal class InternalApi(
             offset += pageTracks.size
         }
 
-        return playlist.copy(tracks = allTracks)
+        return playlist.copy(tracks = allTracks, truncated = truncated)
     }
 
     override fun getArtist(id: SpotifyId): Artist? {
@@ -246,14 +253,15 @@ internal class InternalApi(
                     }
                 val html =
                     httpInterfaceManager.getInterface().use { client ->
-                        val response = client.execute(embedRequest)
-                        if (response.statusLine.statusCode in 200..299) {
-                            response.entity
-                                ?.content
-                                ?.bufferedReader(Charsets.UTF_8)
-                                ?.readText()
-                        } else {
-                            null
+                        client.execute(embedRequest).use { response ->
+                            if (response.statusLine.statusCode in 200..299) {
+                                response.entity
+                                    ?.content
+                                    ?.bufferedReader(Charsets.UTF_8)
+                                    ?.readText()
+                            } else {
+                                null
+                            }
                         }
                     }
                 if (html != null) {
@@ -297,7 +305,7 @@ internal class InternalApi(
         isAudiobook: Boolean,
         limit: Int,
     ): Show? {
-        val kind = if (isAudiobook) "show" else "show"
+        val kind = "show"
         val op =
             if (isAudiobook) {
                 PersistedQueries.QUERY_BOOK_CHAPTERS
@@ -317,6 +325,7 @@ internal class InternalApi(
 
         val allEpisodes = show.episodes.toMutableList()
         var offset = allEpisodes.size
+        var truncated = false
         while (allEpisodes.size < limit && offset < show.totalEpisodes) {
             val pageLimit = min(limit - allEpisodes.size, 100)
             val pageVariables =
@@ -326,6 +335,7 @@ internal class InternalApi(
                     postQuery(op, pageVariables)
                 } catch (e: Exception) {
                     log.warn("failed paging show {}: {}", id.value, e.message)
+                    truncated = true
                     break
                 }
             val pageShow =
@@ -337,12 +347,16 @@ internal class InternalApi(
             offset += pageShow.episodes.size
         }
 
-        return show.copy(episodes = allEpisodes)
+        return show.copy(episodes = allEpisodes, truncated = truncated)
     }
 
     override fun suggest(query: String): List<Track> {
-        val sanitized = escapeJson(query)
-        val variables = """{"query":"$sanitized"}"""
+        val variables =
+            JsonBrowser
+                .newMap()
+                .apply {
+                    put("query", query)
+                }.format()
         val response = postQuery(PersistedQueries.SEARCH_SUGGESTIONS, variables)
         return parser.parseSearchSuggestions(response)
     }
@@ -406,28 +420,12 @@ internal class InternalApi(
             val message = firstError.get("message").text() ?: "Unknown error"
             val code = firstError.get("extensions").get("code").text()
             if (code == "PERSISTED_QUERY_NOT_FOUND") {
-                log.warn("persisted query not found for operation {}", operationName)
+                throw SpotifyException.QueryRejected(operationName)
             }
             throw SpotifyException("graphql query error ($operationName): $message")
         }
         return response
     }
-
-    private fun escapeJson(input: String): String =
-        buildString(input.length) {
-            for (char in input) {
-                when (char) {
-                    '\\' -> append("\\\\")
-                    '"' -> append("\\\"")
-                    '\b' -> append("\\b")
-                    '\u000c' -> append("\\f")
-                    '\n' -> append("\\n")
-                    '\r' -> append("\\r")
-                    '\t' -> append("\\t")
-                    else -> append(char)
-                }
-            }
-        }
 
     companion object {
         const val DEFAULT_ENDPOINT_URL: String =

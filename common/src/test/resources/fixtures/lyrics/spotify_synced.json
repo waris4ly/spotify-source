@@ -1,0 +1,37 @@
+{
+  "lyrics": {
+    "syncType": "LINE_SYNCED",
+    "defaultForSyncType": "LINE_SYNCED",
+    "lyricsProvider": "musixmatch",
+    "providerDisplayName": "Musixmatch",
+    "syncId": "12345",
+    "language": "en",
+    "isRtlLanguage": false,
+    "lines": [
+      {
+        "startTimeMs": "12000",
+        "words": "First line of the song",
+        "syllables": [],
+        "endTimeMs": "15500"
+      },
+      {
+        "startTimeMs": "16000",
+        "words": "♪",
+        "syllables": [],
+        "endTimeMs": "0"
+      },
+      {
+        "startTimeMs": "20000",
+        "words": "Second line of the song",
+        "syllables": [],
+        "endTimeMs": "0"
+      },
+      {
+        "startTimeMs": "25000",
+        "words": "Final line",
+        "syllables": [],
+        "endTimeMs": "29000"
+      }
+    ]
+  }
+}

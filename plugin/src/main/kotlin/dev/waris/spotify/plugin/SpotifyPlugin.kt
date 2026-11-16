@@ -1,5 +1,7 @@
 package dev.waris.spotify.plugin
 
+import com.github.topi314.lavalyrics.LyricsManager
+import com.github.topi314.lavalyrics.api.LyricsManagerConfiguration
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager
 import dev.arbjerg.lavalink.api.AudioPlayerManagerConfiguration
 import dev.waris.spotify.SpotifyAudioSourceManager
@@ -11,16 +13,15 @@ import org.springframework.stereotype.Service
 @EnableConfigurationProperties(PluginSettings::class)
 public class SpotifyPlugin(
     private val settings: PluginSettings,
-) : AudioPlayerManagerConfiguration {
+) : AudioPlayerManagerConfiguration,
+    LyricsManagerConfiguration {
     private val log = LoggerFactory.getLogger(SpotifyPlugin::class.java)
 
-    override fun configure(manager: AudioPlayerManager): AudioPlayerManager {
-        if (!settings.enabled) {
-            log.info("Spotify plugin is disabled by configuration")
-            return manager
-        }
+    private val source: SpotifyAudioSourceManager? by lazy { createSource() }
 
-        // warn if another spotify source manager like lavasrc is already registered
+    override fun configure(manager: AudioPlayerManager): AudioPlayerManager {
+        val active = source ?: return manager
+
         val hasExistingSpotify =
             manager.sourceManagers.any { it.sourceName.equals("spotify", ignoreCase = true) }
         if (hasExistingSpotify) {
@@ -30,6 +31,28 @@ public class SpotifyPlugin(
             )
         }
 
+        manager.registerSourceManager(active)
+        active.attach(manager)
+        log.info("Spotify audio source registered successfully")
+        return manager
+    }
+
+    override fun configure(manager: LyricsManager): LyricsManager {
+        val active = source ?: return manager
+        if (!settings.lyrics) {
+            return manager
+        }
+        manager.registerLyricsManager(SpotifyLyricsManager(active))
+        log.info("Spotify lyrics manager registered")
+        return manager
+    }
+
+    private fun createSource(): SpotifyAudioSourceManager? {
+        if (!settings.enabled) {
+            log.info("Spotify plugin is disabled by configuration")
+            return null
+        }
+
         val missingOfficialCreds =
             settings.clientId.isBlank() || settings.clientSecret.isBlank()
         if (missingOfficialCreds && !settings.internalBackend) {
@@ -37,19 +60,15 @@ public class SpotifyPlugin(
                 "Spotify official credentials missing and internalBackend is false; " +
                     "Spotify source stays unregistered",
             )
-            return manager
+            return null
         }
 
         var effectiveOptions = settings.toOptions()
-        // canvas video loops require an account cookie so disable gracefully if cookie is missing
         if (settings.canvas && settings.accountCookie.isBlank()) {
             log.warn("canvas: true configured without accountCookie; disabling canvas feature")
             effectiveOptions = effectiveOptions.copy(canvas = false)
         }
 
-        val sourceManager = SpotifyAudioSourceManager(effectiveOptions)
-        manager.registerSourceManager(sourceManager)
-        log.info("Spotify audio source registered successfully")
-        return manager
+        return SpotifyAudioSourceManager(effectiveOptions)
     }
 }

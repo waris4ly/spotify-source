@@ -29,6 +29,16 @@ internal class ApiRouter(
     private val backendCooldowns = ConcurrentHashMap<String, TimeMark>()
     private val consecutiveFailures = ConcurrentHashMap<String, Int>()
     private val isrcInflight = InflightRequests<String, Isrc?>()
+    private val loggedQueryRejections = ConcurrentHashMap.newKeySet<String>()
+
+    private fun handleQueryRejected(
+        backendName: String,
+        e: SpotifyException.QueryRejected,
+    ) {
+        if (loggedQueryRejections.add(e.operationName)) {
+            log.warn("backend {} rejected query for operation {}", backendName, e.operationName)
+        }
+    }
 
     fun isBackendCoolingDown(name: String): Boolean {
         val cooldownMark = backendCooldowns[name] ?: return false
@@ -86,6 +96,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during search", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for search: {}", backend.name, e.message)
@@ -109,6 +121,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during track lookup", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for track {}: {}", backend.name, id.value, e.message)
@@ -135,6 +149,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during album lookup", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for album {}: {}", backend.name, id.value, e.message)
@@ -162,6 +178,8 @@ internal class ApiRouter(
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during playlist lookup", backend.name)
                 throw e
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for playlist {}: {}", backend.name, id.value, e.message)
@@ -191,6 +209,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during artist lookup", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for artist {}: {}", backend.name, id.value, e.message)
@@ -215,6 +235,8 @@ internal class ApiRouter(
                 } catch (e: SpotifyException.RateLimit) {
                     recordFailure(backend.name, isRateLimit = true)
                     log.warn("backend {} rate limited during isrc lookup", backend.name)
+                } catch (e: SpotifyException.QueryRejected) {
+                    handleQueryRejected(backend.name, e)
                 } catch (e: SpotifyException) {
                     recordFailure(backend.name, isRateLimit = false)
                     log.warn(
@@ -246,6 +268,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during episode lookup", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn(
@@ -278,6 +302,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during show lookup", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn(
@@ -304,6 +330,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during suggest", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for suggest: {}", backend.name, e.message)
@@ -328,6 +356,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during recommendations", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for recommendations: {}", backend.name, e.message)
@@ -352,6 +382,8 @@ internal class ApiRouter(
             } catch (e: SpotifyException.RateLimit) {
                 recordFailure(backend.name, isRateLimit = true)
                 log.warn("backend {} rate limited during similar", backend.name)
+            } catch (e: SpotifyException.QueryRejected) {
+                handleQueryRejected(backend.name, e)
             } catch (e: SpotifyException) {
                 recordFailure(backend.name, isRateLimit = false)
                 log.warn("backend {} failed for similar: {}", backend.name, e.message)
@@ -394,12 +426,12 @@ internal class ApiRouter(
             return false
         }
         if (isBackendCoolingDown(backend.name)) {
-            log.warn("skipping backend {} because it is cooling down", backend.name)
+            log.debug("skipping backend {} because it is cooling down", backend.name)
             return false
         }
         val tokenKind = backend.tokenKindFor(operation)
         if (tokenKind != null && tokenManager.isCoolingDown(tokenKind)) {
-            log.warn("skipping backend {} because {} is cooling down", backend.name, tokenKind)
+            log.debug("skipping backend {} because {} is cooling down", backend.name, tokenKind)
             return false
         }
         return true

@@ -36,10 +36,18 @@ internal class SpotifyHttp(
                 request.setHeader("Authorization", "Bearer ${token.value}")
             }
 
-            val response =
+            val (statusCode, content, retryAfterHeader) =
                 try {
                     httpInterfaceManager.getInterface().use { http ->
-                        http.execute(request)
+                        http.execute(request).use { response ->
+                            val code = response.statusLine.statusCode
+                            val retryHeader = response.getFirstHeader("Retry-After")?.value
+                            val body =
+                                response.entity?.content?.use {
+                                    JsonBrowser.parse(it)
+                                } ?: JsonBrowser.NULL_BROWSER
+                            Triple(code, body, retryHeader)
+                        }
                     }
                 } catch (e: IOException) {
                     // retry once on transient network drop before failing
@@ -52,18 +60,9 @@ internal class SpotifyHttp(
                     throw SpotifyException("request failed: ${e.message}", e)
                 }
 
-            val statusCode = response.statusLine.statusCode
-
             if (statusCode in 200..299) {
-                return response.entity?.content?.use {
-                    JsonBrowser.parse(it)
-                } ?: JsonBrowser.NULL_BROWSER
+                return content
             }
-
-            val content =
-                response.entity?.content?.use {
-                    JsonBrowser.parse(it)
-                } ?: JsonBrowser.NULL_BROWSER
 
             when (statusCode) {
                 // invalidate token and retry once if spotify rejects it with 401
@@ -88,7 +87,7 @@ internal class SpotifyHttp(
 
                 429 -> {
                     val retryAfterSeconds =
-                        response.getFirstHeader("Retry-After")?.value?.toLongOrNull() ?: 1
+                        retryAfterHeader?.toLongOrNull() ?: 1
                     val reason =
                         content.get("error").get("reason").text()
                             ?: content.get("reason").text()

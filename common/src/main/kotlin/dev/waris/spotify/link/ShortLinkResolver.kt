@@ -40,19 +40,32 @@ internal class ShortLinkResolver(
             val (statusCode, location, body) =
                 try {
                     httpInterfaceManager.getInterface().use { http ->
-                        val response = http.execute(request)
-                        val code = response.statusLine.statusCode
-                        val loc = response.getFirstHeader("Location")?.value
-                        val entityText =
-                            if (code in 200..299) {
-                                response.entity
-                                    ?.content
-                                    ?.bufferedReader(Charsets.UTF_8)
-                                    ?.readText()
-                            } else {
-                                null
-                            }
-                        Triple(code, loc, entityText)
+                        http.execute(request).use { response ->
+                            val code = response.statusLine.statusCode
+                            val loc = response.getFirstHeader("Location")?.value
+                            val entityText =
+                                if (code in 200..299) {
+                                    response.entity?.content?.use { inputStream ->
+                                        val reader = inputStream.bufferedReader(Charsets.UTF_8)
+                                        val buffer = CharArray(MAX_BODY_CHARS)
+                                        var totalRead = 0
+                                        while (totalRead < MAX_BODY_CHARS) {
+                                            val read =
+                                                reader.read(
+                                                    buffer,
+                                                    totalRead,
+                                                    MAX_BODY_CHARS - totalRead,
+                                                )
+                                            if (read == -1) break
+                                            totalRead += read
+                                        }
+                                        if (totalRead > 0) String(buffer, 0, totalRead) else ""
+                                    }
+                                } else {
+                                    null
+                                }
+                            Triple(code, loc, entityText)
+                        }
                     }
                 } catch (e: IOException) {
                     log.warn("failed resolving short link {}: {}", currentUrl, e.message)
@@ -105,6 +118,7 @@ internal class ShortLinkResolver(
     }
 
     companion object {
+        private const val MAX_BODY_CHARS: Int = 256 * 1024
         const val DEFAULT_MAX_HOPS: Int = 5
         private const val USER_AGENT: String =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0"

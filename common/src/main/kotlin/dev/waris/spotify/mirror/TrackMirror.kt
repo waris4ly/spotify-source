@@ -9,12 +9,13 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo
 import dev.waris.spotify.SpotifyOptions
 import dev.waris.spotify.api.ApiRouter
 import dev.waris.spotify.api.internal.ClientMetadata
+import dev.waris.spotify.cache.InflightRequests
 import dev.waris.spotify.cache.TtlCache
 import dev.waris.spotify.model.SpotifyId
 import kotlin.time.Duration.Companion.minutes
 import org.slf4j.LoggerFactory
 
-internal class TrackMirror(
+internal open class TrackMirror(
     private val options: SpotifyOptions,
     private val apiRouter: ApiRouter,
     private val candidateScorer: CandidateScorer =
@@ -22,7 +23,8 @@ internal class TrackMirror(
     private val clientMetadata: ClientMetadata? = null,
 ) {
     private val log = LoggerFactory.getLogger(TrackMirror::class.java)
-    private val cache = TtlCache<String, AudioTrack>()
+    private val cache = TtlCache<String, AudioTrack>(maxSize = MIRROR_CACHE_CAP)
+    private val inflight = InflightRequests<String, AudioTrack>()
 
     init {
         for (provider in options.mirrorProviders) {
@@ -39,23 +41,50 @@ internal class TrackMirror(
         cache.clear()
     }
 
-    fun resolve(
+    internal fun cacheKey(trackInfo: AudioTrackInfo): String =
+        if (trackInfo.identifier == "local") {
+            "local:${trackInfo.title}:${trackInfo.author}:${trackInfo.length}"
+        } else {
+            trackInfo.identifier
+        }
+
+    open fun resolve(
         trackInfo: AudioTrackInfo,
         playerManager: AudioPlayerManager,
         useCache: Boolean = true,
     ): ResolveResult {
+        val key = cacheKey(trackInfo)
         // return cached mirror track if previously resolved to save network calls
         if (useCache) {
-            val cached = cache.get(trackInfo.identifier)
+            val cached = cache.get(key)
             if (cached != null) {
-                log.debug("using cached mirror for {}", trackInfo.identifier)
+                log.debug("using cached mirror for {}", key)
                 return ResolveResult(cached.makeClone(), wasCached = true)
             }
         }
 
+        val track =
+            inflight.execute(key) {
+                if (useCache) {
+                    val cached = cache.get(key)
+                    if (cached != null) {
+                        return@execute cached
+                    }
+                }
+                resolveAndCache(key, trackInfo, playerManager)
+            }
+
+        return ResolveResult(track.makeClone(), wasCached = false)
+    }
+
+    private fun resolveAndCache(
+        key: String,
+        trackInfo: AudioTrackInfo,
+        playerManager: AudioPlayerManager,
+    ): AudioTrack {
         var isrc = trackInfo.isrc
         // defensively query client metadata or official api if track is missing isrc
-        if (isrc.isNullOrBlank()) {
+        if (isrc.isNullOrBlank() && trackInfo.identifier != "local") {
             isrc = fetchIsrcDefensively(trackInfo.identifier)
         }
 
@@ -94,11 +123,11 @@ internal class TrackMirror(
             val best = candidateScorer.findBest(trackInfo, candidates)
             if (best != null) {
                 cache.put(
-                    trackInfo.identifier,
+                    key,
                     best.makeClone(),
                     options.mirrorCacheMinutes.minutes,
                 )
-                return ResolveResult(best, wasCached = false)
+                return best
             }
         }
 
@@ -109,7 +138,11 @@ internal class TrackMirror(
         )
     }
 
-    fun invalidate(identifier: String) {
+    open fun invalidate(trackInfo: AudioTrackInfo) {
+        invalidate(cacheKey(trackInfo))
+    }
+
+    open fun invalidate(identifier: String) {
         cache.remove(identifier)
     }
 
@@ -131,6 +164,9 @@ internal class TrackMirror(
     }
 
     private fun fetchIsrcDefensively(identifier: String): String? {
+        if (identifier == "local") {
+            return null
+        }
         val isrc =
             try {
                 apiRouter.getIsrc(SpotifyId(identifier))?.value
@@ -159,5 +195,9 @@ internal class TrackMirror(
                 "mirror provider template cannot use Spotify source or recursion: $template",
             )
         }
+    }
+
+    private companion object {
+        private const val MIRROR_CACHE_CAP = 10_000
     }
 }

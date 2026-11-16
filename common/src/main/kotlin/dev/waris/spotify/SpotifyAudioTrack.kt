@@ -34,9 +34,16 @@ public class SpotifyAudioTrack(
 
         try {
             processDelegate(track, executor)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw e
         } catch (e: Exception) {
+            if (e.cause is InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw e
+            }
             if (result.wasCached) {
-                mirror.invalidate(trackInfo.identifier)
+                mirror.invalidate(trackInfo)
                 val retryResult = mirror.resolve(trackInfo, playerManager, useCache = false)
                 val retryTrack =
                     retryResult.track as? InternalAudioTrack
@@ -45,7 +52,12 @@ public class SpotifyAudioTrack(
                             FriendlyException.Severity.FAULT,
                             null,
                         )
-                processDelegate(retryTrack, executor)
+                try {
+                    processDelegate(retryTrack, executor)
+                } catch (retryInterrupted: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw retryInterrupted
+                }
             } else {
                 throw e
             }

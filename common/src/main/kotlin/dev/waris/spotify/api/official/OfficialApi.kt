@@ -51,7 +51,8 @@ internal class OfficialApi(
         val cappedLimit = limit.coerceIn(1, 10)
         val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.name())
         val url =
-            "$baseUrl/search?q=$encoded&type=track&limit=$cappedLimit&offset=$offset&market=$countryCode"
+            "$baseUrl/search?q=$encoded&type=track&limit=$cappedLimit" +
+                "&offset=$offset&market=$countryCode"
         val json = http.execute(HttpGet(url), TokenKind.CLIENT)
         return parser.parseSearch(json)
     }

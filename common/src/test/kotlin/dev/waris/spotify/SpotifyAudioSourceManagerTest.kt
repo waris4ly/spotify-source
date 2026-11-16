@@ -13,12 +13,23 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo
 import dev.waris.spotify.api.ApiRouter
 import dev.waris.spotify.api.SpotifyHttp
 import dev.waris.spotify.api.internal.InternalApi
+import dev.waris.spotify.api.lyrics.Lyrics
+import dev.waris.spotify.api.lyrics.LyricsLine
+import dev.waris.spotify.api.lyrics.LyricsProvider
+import dev.waris.spotify.api.lyrics.LyricsQuery
+import dev.waris.spotify.api.lyrics.LyricsService
+import dev.waris.spotify.api.lyrics.LyricsSync
 import dev.waris.spotify.api.official.OfficialApi
 import dev.waris.spotify.auth.AccessToken
 import dev.waris.spotify.auth.TokenKind
 import dev.waris.spotify.auth.TokenManager
 import dev.waris.spotify.auth.TokenProvider
 import dev.waris.spotify.convert.AudioItemFactory
+import dev.waris.spotify.enrich.ArtworkColors
+import dev.waris.spotify.enrich.CanvasLookup
+import dev.waris.spotify.enrich.ExtractedColors
+import dev.waris.spotify.mirror.TrackMirror
+import dev.waris.spotify.model.SpotifyId
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -28,6 +39,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeSource
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -261,6 +273,125 @@ class SpotifyAudioSourceManagerTest {
     }
 
     @Test
+    fun loadItem_playlistCutShortByFailure_notCached() {
+        val fixture = loadFixture("internal/playlist_normal.json")
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "application/json")
+                .body(fixture)
+                .build(),
+        )
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "application/json")
+                .body("""{"errors":[{"message":"fetch failed"}]}""")
+                .build(),
+        )
+
+        val playlistRef =
+            AudioReference("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M", null)
+        val item = sourceManager.loadItem(playerManager, playlistRef)
+
+        assertNotNull(item)
+        assertTrue(item is SpotifyAudioPlaylist)
+        val playlist = item as SpotifyAudioPlaylist
+        assertEquals(2, playlist.tracks.size)
+        assertTrue(playlist.truncated)
+
+        assertNull(
+            sourceManager.metadataCache.get(
+                "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+            ),
+        )
+
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "application/json")
+                .body(fixture)
+                .build(),
+        )
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "application/json")
+                .body("""{"errors":[{"message":"fetch failed"}]}""")
+                .build(),
+        )
+
+        val secondItem = sourceManager.loadItem(playerManager, playlistRef)
+        assertNotNull(secondItem)
+        assertEquals(4, server.requestCount)
+    }
+
+    @Test
+    fun loadItem_playlistTruncatedByLimit_isCached() {
+        val limitedOptions =
+            SpotifyOptions(
+                clientId = "test-id",
+                clientSecret = "test-secret",
+                internalBackend = true,
+                countryCode = "US",
+                playlistLoadLimit = 2,
+            )
+        val spotifyHttp = SpotifyHttp(httpInterfaceManager, tokenManager)
+        val internalApi =
+            InternalApi(
+                http = spotifyHttp,
+                endpointUrl = server.url("/pathfinder/v2/query").toString(),
+                options = limitedOptions,
+            )
+        val apiRouter = ApiRouter(listOf(internalApi), tokenManager)
+        val limitedSourceManager =
+            SpotifyAudioSourceManager(
+                options = limitedOptions,
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+                apiRouter = apiRouter,
+                audioItemFactory = AudioItemFactory(),
+            )
+        try {
+            val fixture = loadFixture("internal/playlist_normal.json")
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(200)
+                    .setHeader("Content-Type", "application/json")
+                    .body(fixture)
+                    .build(),
+            )
+
+            val playlistRef =
+                AudioReference("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M", null)
+            val item = limitedSourceManager.loadItem(playerManager, playlistRef)
+
+            assertNotNull(item)
+            assertTrue(item is SpotifyAudioPlaylist)
+            val playlist = item as SpotifyAudioPlaylist
+            assertEquals(2, playlist.tracks.size)
+            assertFalse(playlist.truncated)
+
+            val cached =
+                limitedSourceManager.metadataCache.get(
+                    "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+                )
+            assertNotNull(cached)
+
+            val secondItem = limitedSourceManager.loadItem(playerManager, playlistRef)
+            assertNotNull(secondItem)
+            assertEquals(1, server.requestCount)
+        } finally {
+            limitedSourceManager.shutdown()
+        }
+    }
+
+    @Test
     fun loadItem_playlistPrivate_throwsFriendlyException() {
         val fixture = loadFixture("internal/playlist_private.json")
         server.enqueue(
@@ -443,6 +574,150 @@ class SpotifyAudioSourceManagerTest {
         assertEquals(trackInfo.artworkUrl, decoded.info.artworkUrl)
         assertEquals(trackInfo.isrc, decoded.info.isrc)
         assertEquals(sourceManager, decoded.sourceManager)
+    }
+
+    @Test
+    fun encodeTrack_decodeTrack_preservesCanvasColorsAndPreview() {
+        val trackInfo =
+            AudioTrackInfo(
+                "Track With Metadata",
+                "Author",
+                210000L,
+                "metaId",
+                false,
+                "https://open.spotify.com/track/metaId",
+                "https://example.com/art.jpg",
+                "USUM71600787",
+            )
+        val originalTrack =
+            SpotifyAudioTrack(
+                trackInfo,
+                sourceManager,
+                canvasUrl = "https://canvas.spotify.com/canvas1.mp4",
+                colors = mapOf("background" to "#121212", "text" to "#ffffff"),
+                previewUrl = "https://p.scdn.co/mp3-preview/preview1.mp3",
+            )
+
+        val byteStream = ByteArrayOutputStream()
+        val dataOutput = DataOutputStream(byteStream)
+        sourceManager.encodeTrack(originalTrack, dataOutput)
+
+        val dataInput = DataInputStream(ByteArrayInputStream(byteStream.toByteArray()))
+        val decoded = sourceManager.decodeTrack(trackInfo, dataInput) as SpotifyAudioTrack
+
+        assertEquals(originalTrack.canvasUrl, decoded.canvasUrl)
+        assertEquals(originalTrack.colors, decoded.colors)
+        assertEquals(originalTrack.previewUrl, decoded.previewUrl)
+    }
+
+    @Test
+    fun encodeTrack_decodeTrack_allFieldsNull() {
+        val trackInfo =
+            AudioTrackInfo(
+                "Track With Nulls",
+                "Author",
+                180000L,
+                "nullId",
+                false,
+                "https://open.spotify.com/track/nullId",
+                null,
+                null,
+            )
+        val originalTrack =
+            SpotifyAudioTrack(
+                trackInfo,
+                sourceManager,
+                canvasUrl = null,
+                colors = null,
+                previewUrl = null,
+            )
+
+        val byteStream = ByteArrayOutputStream()
+        val dataOutput = DataOutputStream(byteStream)
+        sourceManager.encodeTrack(originalTrack, dataOutput)
+
+        val dataInput = DataInputStream(ByteArrayInputStream(byteStream.toByteArray()))
+        val decoded = sourceManager.decodeTrack(trackInfo, dataInput) as SpotifyAudioTrack
+
+        assertNull(decoded.canvasUrl)
+        assertNull(decoded.colors)
+        assertNull(decoded.previewUrl)
+    }
+
+    @Test
+    fun decodeTrack_toleratesEmptyPayloadFromOldEncoder() {
+        val trackInfo =
+            AudioTrackInfo(
+                "Old Track",
+                "Author",
+                180000L,
+                "oldId",
+                false,
+                "https://open.spotify.com/track/oldId",
+                null,
+                null,
+            )
+        val dataInput = DataInputStream(ByteArrayInputStream(ByteArray(0)))
+        val decoded = sourceManager.decodeTrack(trackInfo, dataInput) as SpotifyAudioTrack
+
+        assertNotNull(decoded)
+        assertNull(decoded.canvasUrl)
+        assertNull(decoded.colors)
+        assertNull(decoded.previewUrl)
+    }
+
+    @Test
+    fun decodeTrack_toleratesTruncatedPayload() {
+        val trackInfo =
+            AudioTrackInfo(
+                "Truncated Track",
+                "Author",
+                180000L,
+                "truncId",
+                false,
+                "https://open.spotify.com/track/truncId",
+                null,
+                null,
+            )
+        val byteStream = ByteArrayOutputStream()
+        val dataOutput = DataOutputStream(byteStream)
+        dataOutput.writeByte(1)
+        dataOutput.writeBoolean(true)
+
+        val dataInput = DataInputStream(ByteArrayInputStream(byteStream.toByteArray()))
+        val decoded = sourceManager.decodeTrack(trackInfo, dataInput) as SpotifyAudioTrack
+
+        assertNotNull(decoded)
+        assertNull(decoded.canvasUrl)
+        assertNull(decoded.colors)
+        assertNull(decoded.previewUrl)
+    }
+
+    @Test
+    fun attach_attachesPlayerManagerWithoutCallingLoadItem() {
+        val isolatedSource = SpotifyAudioSourceManager()
+        val isolatedManager = DefaultAudioPlayerManager()
+        try {
+            isolatedSource.attach(isolatedManager)
+            val trackInfo =
+                AudioTrackInfo(
+                    "Track Without Load",
+                    "Author",
+                    180000L,
+                    "standaloneId",
+                    false,
+                    "https://open.spotify.com/track/standaloneId",
+                )
+            val dataInput = DataInputStream(ByteArrayInputStream(ByteArray(0)))
+            val decoded = isolatedSource.decodeTrack(trackInfo, dataInput)
+
+            assertNotNull(decoded)
+            assertNotNull(isolatedSource.playerManager)
+            assertEquals(isolatedManager, isolatedSource.playerManager)
+        } finally {
+            isolatedSource.shutdown()
+            isolatedManager.shutdown()
+        }
     }
 
     @Test
@@ -657,5 +932,244 @@ class SpotifyAudioSourceManagerTest {
         val ref = AudioReference("spotify:local:Artist:Album:Song:200", null)
         val item = sourceManager.loadItem(playerManager, ref)
         assertEquals(AudioReference.NO_TRACK, item)
+    }
+
+    @Test
+    fun loadItem_enrichmentNeverFinishingDoesNotDelayBeyondDeadlineAndLeavesFieldsNull() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "application/json")
+                .body(loadFixture("official/track.json"))
+                .build(),
+        )
+
+        val spotifyHttp =
+            SpotifyHttp(
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+            )
+        val slowCanvas =
+            object : CanvasLookup(spotifyHttp) {
+                override fun fetchCanvasUrl(trackId: SpotifyId): String? {
+                    Thread.sleep(10000)
+                    return "https://canvas.url"
+                }
+            }
+        val slowColors =
+            object : ArtworkColors(spotifyHttp) {
+                override fun fetchColors(artworkUrl: String?): ExtractedColors? {
+                    Thread.sleep(10000)
+                    return ExtractedColors(dark = "#000", light = "#fff", raw = "#123")
+                }
+            }
+
+        val officialApi =
+            OfficialApi(
+                http = spotifyHttp,
+                baseUrl = server.url("/v1/").toString(),
+                countryCode = "US",
+            )
+        val router = ApiRouter(listOf(officialApi), tokenManager)
+        val options = SpotifyOptions()
+        val manager =
+            SpotifyAudioSourceManager(
+                options = options,
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+                apiRouter = router,
+                audioItemFactory = AudioItemFactory(),
+                trackMirror = TrackMirror(options, router),
+                canvasLookup = slowCanvas,
+                artworkColors = slowColors,
+            )
+
+        val startTime = System.currentTimeMillis()
+        try {
+            val track =
+                manager.loadItem(
+                    playerManager,
+                    AudioReference("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT", null),
+                ) as? SpotifyAudioTrack
+            val elapsed = System.currentTimeMillis() - startTime
+
+            assertNotNull(track)
+            assertNull(track?.canvasUrl)
+            assertNull(track?.colors)
+            assertTrue(elapsed < 1400, "Expected elapsed < 1400ms but was ${elapsed}ms")
+        } finally {
+            manager.shutdown()
+        }
+    }
+
+    @Test
+    fun loadItem_failingEnrichmentLeavesFieldsNullAndDoesNotThrow() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(200)
+                .setHeader("Content-Type", "application/json")
+                .body(loadFixture("official/track.json"))
+                .build(),
+        )
+
+        val spotifyHttp =
+            SpotifyHttp(
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+            )
+        val failingCanvas =
+            object : CanvasLookup(spotifyHttp) {
+                override fun fetchCanvasUrl(trackId: SpotifyId): String? =
+                    throw RuntimeException("canvas backend failure")
+            }
+        val failingColors =
+            object : ArtworkColors(spotifyHttp) {
+                override fun fetchColors(artworkUrl: String?): ExtractedColors? =
+                    throw RuntimeException("colors backend failure")
+            }
+
+        val officialApi =
+            OfficialApi(
+                http = spotifyHttp,
+                baseUrl = server.url("/v1/").toString(),
+                countryCode = "US",
+            )
+        val router = ApiRouter(listOf(officialApi), tokenManager)
+        val options = SpotifyOptions()
+        val manager =
+            SpotifyAudioSourceManager(
+                options = options,
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+                apiRouter = router,
+                audioItemFactory = AudioItemFactory(),
+                trackMirror = TrackMirror(options, router),
+                canvasLookup = failingCanvas,
+                artworkColors = failingColors,
+            )
+
+        try {
+            val track =
+                manager.loadItem(
+                    playerManager,
+                    AudioReference("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT", null),
+                ) as? SpotifyAudioTrack
+
+            assertNotNull(track)
+            assertNull(track?.canvasUrl)
+            assertNull(track?.colors)
+        } finally {
+            manager.shutdown()
+        }
+    }
+
+    @Test
+    fun shutdown_terminatesEnrichmentExecutorAndLeavesNoLiveThreads() {
+        val options = SpotifyOptions()
+        val router = ApiRouter(emptyList(), tokenManager)
+        val manager =
+            SpotifyAudioSourceManager(
+                options = options,
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+                apiRouter = router,
+                audioItemFactory = AudioItemFactory(),
+                trackMirror = TrackMirror(options, router),
+            )
+
+        manager.enrichmentExecutor.submit { Thread.sleep(50) }
+
+        manager.shutdown()
+
+        assertTrue(manager.enrichmentExecutor.isShutdown)
+        assertTrue(manager.enrichmentExecutor.isTerminated)
+
+        val liveEnrichmentThreads =
+            Thread.getAllStackTraces().keys.filter {
+                it.name.startsWith("spotify-enrichment") && it.isAlive
+            }
+        assertTrue(liveEnrichmentThreads.isEmpty(), "Found live threads: $liveEnrichmentThreads")
+    }
+
+    @Test
+    fun loadItem_unrelatedUrlContainingSpotifyDotCom_returnsNull() {
+        val item =
+            sourceManager.loadItem(
+                playerManager,
+                AudioReference("https://example.com/?u=open.spotify.com/track/x", null),
+            )
+        assertNull(item)
+    }
+
+    @Test
+    fun loadLyrics_whenLyricsDisabled_returnsNull() {
+        val manager = SpotifyAudioSourceManager(SpotifyOptions(lyrics = false))
+        val track =
+            SpotifyAudioTrack(
+                AudioTrackInfo(
+                    "Track",
+                    "Artist",
+                    200_000,
+                    "4eoOQgFQ0rLMKNP8KcUNWc",
+                    false,
+                    "https://open.spotify.com/track/4eoOQgFQ0rLMKNP8KcUNWc",
+                ),
+                sourceManager,
+            )
+        assertNull(manager.loadLyrics(track))
+    }
+
+    @Test
+    fun loadLyrics_whenLyricsServiceProvided_delegatesToService() {
+        val lyrics =
+            Lyrics(
+                provider = "spotify",
+                providerLabel = "Musixmatch",
+                sync = LyricsSync.LINE,
+                language = "en",
+                rightToLeft = false,
+                lines = listOf(LyricsLine(0, 1000, "Words")),
+            )
+        val provider =
+            object : LyricsProvider {
+                override val name = "test"
+
+                override fun isAvailable() = true
+
+                override fun fetch(query: LyricsQuery) = lyrics
+            }
+        val service = LyricsService(listOf(provider), 10.minutes, 10.minutes)
+        val options = SpotifyOptions()
+        val router = ApiRouter(emptyList(), tokenManager)
+        val manager =
+            SpotifyAudioSourceManager(
+                options = options,
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+                apiRouter = router,
+                audioItemFactory = AudioItemFactory(),
+                trackMirror = TrackMirror(options, router),
+                lyricsService = service,
+            )
+
+        val track =
+            SpotifyAudioTrack(
+                AudioTrackInfo(
+                    "Track",
+                    "Artist",
+                    200_000,
+                    "4eoOQgFQ0rLMKNP8KcUNWc",
+                    false,
+                    "https://open.spotify.com/track/4eoOQgFQ0rLMKNP8KcUNWc",
+                ),
+                manager,
+            )
+
+        val loaded = manager.loadLyrics(track)
+        assertNotNull(loaded)
+        assertEquals("spotify", loaded!!.provider)
+        assertEquals("Musixmatch", loaded.providerLabel)
     }
 }

@@ -8,13 +8,13 @@ import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.StringEntity
 import org.slf4j.LoggerFactory
 
-internal class CanvasLookup(
+internal open class CanvasLookup(
     private val http: SpotifyHttp,
     private val endpointUrl: String = DEFAULT_ENDPOINT_URL,
 ) {
     private val log = LoggerFactory.getLogger(CanvasLookup::class.java)
 
-    fun fetchCanvasUrl(trackId: SpotifyId): String? {
+    open fun fetchCanvasUrl(trackId: SpotifyId): String? {
         // canvas video lookup uses spclient cache endpoint with account token
         val body =
             """

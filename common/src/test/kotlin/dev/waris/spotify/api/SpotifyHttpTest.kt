@@ -160,6 +160,77 @@ class SpotifyHttpTest {
     }
 
     @Test
+    fun execute_429WithRetryAfter5ThrowsRateLimitWithoutSleeping() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(429)
+                .setHeader("Retry-After", "5")
+                .setHeader("Content-Type", "application/json")
+                .body("""{"error": {"message": "Rate limit exceeded"}}""")
+                .build(),
+        )
+
+        val tokenManager = TokenManager(emptyMap())
+        val slept = AtomicBoolean(false)
+        val http =
+            SpotifyHttp(
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+                sleeper = { slept.set(true) },
+            )
+
+        val ex =
+            assertThrows(SpotifyException.RateLimit::class.java) {
+                http.execute(HttpGet(server.url("/v1/items").toString()), tokenKind = null)
+            }
+        assertEquals(5L, ex.retryAfterSeconds)
+        assertFalse(ex.isQuotaExceeded)
+        assertFalse(slept.get())
+        tokenManager.close()
+    }
+
+    @Test
+    fun execute_429RetriesOnlyOnceByDefault() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(429)
+                .setHeader("Retry-After", "1")
+                .setHeader("Content-Type", "application/json")
+                .body("""{"error": {"message": "Rate limit 1"}}""")
+                .build(),
+        )
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .code(429)
+                .setHeader("Retry-After", "1")
+                .setHeader("Content-Type", "application/json")
+                .body("""{"error": {"message": "Rate limit 2"}}""")
+                .build(),
+        )
+
+        val tokenManager = TokenManager(emptyMap())
+        val sleepCount = AtomicInteger(0)
+        val http =
+            SpotifyHttp(
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+                sleeper = { sleepCount.incrementAndGet() },
+            )
+
+        val ex =
+            assertThrows(SpotifyException.RateLimit::class.java) {
+                http.execute(HttpGet(server.url("/v1/items").toString()), tokenKind = null)
+            }
+        assertEquals(1L, ex.retryAfterSeconds)
+        assertEquals(1, sleepCount.get())
+        assertEquals(2, server.requestCount)
+        tokenManager.close()
+    }
+
+    @Test
     fun execute_quotaExceededCoolsDownBackendImmediately() {
         server.enqueue(
             MockResponse
@@ -281,6 +352,40 @@ class SpotifyHttpTest {
         assertEquals("recovered", result.get("status").text())
         assertEquals(1, sleepCount.get())
         assertEquals(2, server.requestCount)
+        tokenManager.close()
+    }
+
+    @Test
+    fun execute_manySequentialRequestsCompleteWithoutPoolExhaustion() {
+        val totalRequests = 50
+        for (i in 1..totalRequests) {
+            val code = if (i % 2 == 0) 200 else 404
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(code)
+                    .setHeader("Content-Type", "application/json")
+                    .body(if (code == 200) """{"id": "$i"}""" else """{"error": "not found"}""")
+                    .build(),
+            )
+        }
+
+        val tokenManager = TokenManager(emptyMap())
+        val http =
+            SpotifyHttp(
+                httpInterfaceManager = httpInterfaceManager,
+                tokenManager = tokenManager,
+            )
+
+        for (i in 1..totalRequests) {
+            val result =
+                http.execute(HttpGet(server.url("/v1/item/$i").toString()), tokenKind = null)
+            if (i % 2 == 0) {
+                assertEquals(i.toString(), result.get("id").text())
+            } else {
+                assertTrue(result.isNull)
+            }
+        }
         tokenManager.close()
     }
 }

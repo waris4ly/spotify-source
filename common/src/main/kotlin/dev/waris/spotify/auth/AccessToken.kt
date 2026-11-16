@@ -3,6 +3,7 @@ package dev.waris.spotify.auth
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 internal data class AccessToken(
@@ -12,7 +13,9 @@ internal data class AccessToken(
 ) {
     fun isExpiring(margin: Duration = 5.minutes): Boolean {
         val now = TimeSource.Monotonic.markNow()
-        return expiresAt - now <= margin
+        val lifetime = expiresInSeconds.coerceAtLeast(0).seconds
+        val effectiveMargin = minOf(margin, lifetime / 2)
+        return expiresAt - now <= effectiveMargin
     }
 
     fun isExpired(): Boolean = expiresAt.hasPassedNow()

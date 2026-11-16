@@ -33,6 +33,7 @@ tasks.named<Jar>("javadocJar") {
 
 dependencies {
     implementation(project(":common"))
+    implementation(libs.lavalyrics.api)
     compileOnly(libs.plugin.api)
     compileOnly(libs.lavaplayer)
     compileOnly(libs.slf4j.api)

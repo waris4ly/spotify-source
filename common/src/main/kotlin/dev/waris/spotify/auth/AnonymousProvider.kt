@@ -5,10 +5,6 @@ import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterfaceManager
 import dev.waris.spotify.error.SpotifyException
 import java.io.IOException
 import java.util.regex.Pattern
-import kotlin.time.ComparableTimeMark
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 import org.apache.http.client.methods.HttpGet
 import org.slf4j.LoggerFactory
 
@@ -16,19 +12,10 @@ internal class AnonymousProvider(
     private val httpInterfaceManager: HttpInterfaceManager,
     private val anonymousTokenUrl: String? = null,
     private val seedUrl: String = DEFAULT_SEED_URL,
-) : TokenProvider {
+) : BaseTokenProvider() {
     private val log = LoggerFactory.getLogger(AnonymousProvider::class.java)
 
     override val kind: TokenKind = TokenKind.ANONYMOUS
-
-    private var coolDownUntil: ComparableTimeMark? = null
-
-    override val isCoolingDown: Boolean
-        get() = coolDownUntil?.let { !it.hasPassedNow() } ?: false
-
-    override fun coolDown(duration: Duration) {
-        coolDownUntil = TimeSource.Monotonic.markNow() + duration
-    }
 
     override fun fetchToken(): AccessToken {
         if (!anonymousTokenUrl.isNullOrBlank()) {
@@ -43,45 +30,27 @@ internal class AnonymousProvider(
                 setHeader("Accept", "application/json")
             }
 
-        val response =
+        val (statusCode, content) =
             try {
                 httpInterfaceManager.getInterface().use { http ->
-                    http.execute(request)
+                    http.execute(request).use { response ->
+                        val code = response.statusLine.statusCode
+                        val parsed =
+                            response.entity?.content?.use {
+                                JsonBrowser.parse(it)
+                            } ?: JsonBrowser.NULL_BROWSER
+                        code to parsed
+                    }
                 }
             } catch (e: IOException) {
                 throw SpotifyException("anonymous token request to custom service failed", e)
             }
 
-        val statusCode = response.statusLine.statusCode
-        val content =
-            response.entity?.content?.use {
-                JsonBrowser.parse(it)
-            } ?: JsonBrowser.NULL_BROWSER
-
         if (statusCode != 200) {
             throw SpotifyException("custom anonymous token endpoint returned status $statusCode")
         }
 
-        val token =
-            content.get("accessToken").text()
-                ?: content.get("access_token").text()
-                ?: content.get("token").text()
-                ?: throw SpotifyException("custom anonymous token response missing token")
-
-        val expiresMs = content.get("accessTokenExpirationTimestampMs").asLong(0)
-        val expiresInSeconds =
-            if (expiresMs > 0) {
-                ((expiresMs - System.currentTimeMillis()) / 1000).coerceAtLeast(60)
-            } else {
-                content.get("expires_in").asLong(3600)
-            }
-
-        val expiresAt = TimeSource.Monotonic.markNow() + expiresInSeconds.seconds
-        return AccessToken(
-            value = token,
-            expiresAt = expiresAt,
-            expiresInSeconds = expiresInSeconds,
-        )
+        return parseAccessToken(content)
     }
 
     private fun fetchFromWebEmbed(): AccessToken {
@@ -93,14 +62,15 @@ internal class AnonymousProvider(
         val html =
             try {
                 httpInterfaceManager.getInterface().use { http ->
-                    val response = http.execute(request)
-                    if (response.statusLine.statusCode != 200) {
-                        null
-                    } else {
-                        response.entity
-                            ?.content
-                            ?.bufferedReader(Charsets.UTF_8)
-                            ?.readText()
+                    http.execute(request).use { response ->
+                        if (response.statusLine.statusCode != 200) {
+                            null
+                        } else {
+                            response.entity
+                                ?.content
+                                ?.bufferedReader(Charsets.UTF_8)
+                                ?.readText()
+                        }
                     }
                 }
             } catch (e: IOException) {
@@ -116,19 +86,7 @@ internal class AnonymousProvider(
                 val session = extractSession(json)
                 val token = session.get("accessToken").text()
                 if (!token.isNullOrEmpty()) {
-                    val expiresMs = session.get("accessTokenExpirationTimestampMs").asLong(0)
-                    val expiresInSeconds =
-                        if (expiresMs > 0) {
-                            ((expiresMs - System.currentTimeMillis()) / 1000).coerceAtLeast(60)
-                        } else {
-                            3600
-                        }
-                    val expiresAt = TimeSource.Monotonic.markNow() + expiresInSeconds.seconds
-                    return AccessToken(
-                        value = token,
-                        expiresAt = expiresAt,
-                        expiresInSeconds = expiresInSeconds,
-                    )
+                    return parseAccessToken(session)
                 }
             }
         }
@@ -142,43 +100,27 @@ internal class AnonymousProvider(
                 setHeader("User-Agent", USER_AGENT)
             }
 
-        val response =
+        val (statusCode, content) =
             try {
                 httpInterfaceManager.getInterface().use { http ->
-                    http.execute(request)
+                    http.execute(request).use { response ->
+                        val code = response.statusLine.statusCode
+                        val parsed =
+                            response.entity?.content?.use {
+                                JsonBrowser.parse(it)
+                            } ?: JsonBrowser.NULL_BROWSER
+                        code to parsed
+                    }
                 }
             } catch (e: IOException) {
                 throw SpotifyException("fallback anonymous token request failed", e)
             }
 
-        val statusCode = response.statusLine.statusCode
-        val content =
-            response.entity?.content?.use {
-                JsonBrowser.parse(it)
-            } ?: JsonBrowser.NULL_BROWSER
-
         if (statusCode != 200) {
             throw SpotifyException("failed to obtain anonymous token: status $statusCode")
         }
 
-        val token =
-            content.get("accessToken").text()
-                ?: throw SpotifyException("fallback anonymous token response missing accessToken")
-
-        val expiresMs = content.get("accessTokenExpirationTimestampMs").asLong(0)
-        val expiresInSeconds =
-            if (expiresMs > 0) {
-                ((expiresMs - System.currentTimeMillis()) / 1000).coerceAtLeast(60)
-            } else {
-                3600
-            }
-
-        val expiresAt = TimeSource.Monotonic.markNow() + expiresInSeconds.seconds
-        return AccessToken(
-            value = token,
-            expiresAt = expiresAt,
-            expiresInSeconds = expiresInSeconds,
-        )
+        return parseAccessToken(content)
     }
 
     private fun extractSession(json: JsonBrowser): JsonBrowser {

@@ -1,0 +1,25 @@
+{
+  "lyrics": {
+    "syncType": "UNSYNCED",
+    "defaultForSyncType": "UNSYNCED",
+    "lyricsProvider": "musixmatch",
+    "providerDisplayName": "Musixmatch",
+    "syncId": "12346",
+    "language": "en",
+    "isRtlLanguage": false,
+    "lines": [
+      {
+        "startTimeMs": "0",
+        "words": "Just a plain line",
+        "syllables": [],
+        "endTimeMs": "0"
+      },
+      {
+        "startTimeMs": "0",
+        "words": "Another plain line",
+        "syllables": [],
+        "endTimeMs": "0"
+      }
+    ]
+  }
+}

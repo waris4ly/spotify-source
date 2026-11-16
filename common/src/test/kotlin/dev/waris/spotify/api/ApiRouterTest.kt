@@ -16,8 +16,11 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.TimeSource
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -357,5 +360,53 @@ class ApiRouterTest {
         assertEquals("Internal Track", result?.title)
         assertEquals(0, officialBackend.trackCallCount)
         assertEquals(1, internalBackend.trackCallCount)
+    }
+
+    @Test
+    fun queryRejected_doesNotTriggerCooldown_genericFailureDoes() {
+        var queryRejectedCount = 0
+        internalBackend.playlistHandler = { _, _ ->
+            queryRejectedCount++
+            throw SpotifyException.QueryRejected("fetchPlaylistModel")
+        }
+
+        val playlistId = SpotifyId("p1")
+
+        router.getPlaylist(playlistId)
+        router.getPlaylist(playlistId)
+        assertEquals(2, queryRejectedCount)
+        assertFalse(router.isBackendCoolingDown("internal"))
+
+        val samplePlaylist =
+            Playlist(
+                id = playlistId,
+                name = "Test Playlist",
+                owner = "Test Owner",
+                tracks = emptyList(),
+            )
+        internalBackend.playlistHandler = { _, _ -> samplePlaylist }
+
+        val result = router.getPlaylist(playlistId)
+        assertNotNull(result)
+        assertEquals("Test Playlist", result?.name)
+        assertEquals(3, internalBackend.playlistCallCount)
+
+        internalBackend.playlistHandler = { _, _ ->
+            throw SpotifyException("network failure")
+        }
+
+        assertThrows(SpotifyException::class.java) {
+            router.getPlaylist(playlistId)
+        }
+        assertThrows(SpotifyException::class.java) {
+            router.getPlaylist(playlistId)
+        }
+
+        assertTrue(router.isBackendCoolingDown("internal"))
+
+        internalBackend.playlistHandler = { _, _ -> samplePlaylist }
+        val afterCooldown = router.getPlaylist(playlistId)
+        assertNull(afterCooldown)
+        assertEquals(5, internalBackend.playlistCallCount)
     }
 }

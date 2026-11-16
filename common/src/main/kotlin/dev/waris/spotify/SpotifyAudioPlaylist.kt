@@ -13,4 +13,5 @@ public class SpotifyAudioPlaylist(
     public val author: String,
     public val artworkUrl: String?,
     public val totalTracks: Int,
+    public val truncated: Boolean = false,
 ) : BasicAudioPlaylist(name, tracks, selectedTrack, isSearchResult)

@@ -17,6 +17,12 @@ import dev.waris.spotify.api.SpotifyApi
 import dev.waris.spotify.api.SpotifyHttp
 import dev.waris.spotify.api.internal.ClientMetadata
 import dev.waris.spotify.api.internal.InternalApi
+import dev.waris.spotify.api.lyrics.LrcLibProvider
+import dev.waris.spotify.api.lyrics.Lyrics
+import dev.waris.spotify.api.lyrics.LyricsQuery
+import dev.waris.spotify.api.lyrics.LyricsService
+import dev.waris.spotify.api.lyrics.SpotifyLyricsProvider
+import dev.waris.spotify.api.lyrics.TrackResolver
 import dev.waris.spotify.api.official.OfficialApi
 import dev.waris.spotify.auth.AccountProvider
 import dev.waris.spotify.auth.AnonymousProvider
@@ -37,8 +43,17 @@ import dev.waris.spotify.model.Base62
 import dev.waris.spotify.model.SpotifyId
 import java.io.DataInput
 import java.io.DataOutput
+import java.io.EOFException
+import java.io.IOException
+import java.io.InputStream
+import java.net.URI
+import java.util.Locale
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
 import java.util.function.Function
 import kotlin.time.Duration.Companion.minutes
@@ -46,23 +61,32 @@ import org.apache.http.client.config.RequestConfig
 import org.apache.http.impl.client.HttpClientBuilder
 import org.slf4j.LoggerFactory
 
-public class SpotifyAudioSourceManager internal constructor(
+public open class SpotifyAudioSourceManager internal constructor(
     public val options: SpotifyOptions,
     private val httpInterfaceManager: HttpInterfaceManager,
     private val tokenManager: TokenManager,
     internal val apiRouter: ApiRouter,
     private val audioItemFactory: AudioItemFactory,
     internal val trackMirror: TrackMirror,
-    internal val metadataCache: TtlCache<String, AudioItem> = TtlCache(),
+    internal val metadataCache: TtlCache<String, AudioItem> =
+        TtlCache(maxSize = METADATA_CACHE_CAP),
     internal val inflightRequests: InflightRequests<String, AudioItem> = InflightRequests(),
     internal val shortLinkResolver: ShortLinkResolver = ShortLinkResolver(httpInterfaceManager),
     internal val artworkColors: ArtworkColors? = null,
     internal val canvasLookup: CanvasLookup? = null,
+    internal val lyricsService: LyricsService? = null,
+    internal val enrichmentExecutor: ExecutorService = createEnrichmentExecutor(),
 ) : AudioSourceManager,
     HttpConfigurable {
-    @Volatile
-    private var _playerManager: AudioPlayerManager? = null
-    public val playerManager: AudioPlayerManager? get() = _playerManager
+    private val log = LoggerFactory.getLogger(SpotifyAudioSourceManager::class.java)
+    public var playerManager: AudioPlayerManager? = null
+
+    public fun attach(manager: AudioPlayerManager) {
+        playerManager = manager
+    }
+
+    public open fun loadLyrics(track: AudioTrack): Lyrics? =
+        lyricsService?.load(LyricsQuery.from(track))
 
     public constructor(options: SpotifyOptions = SpotifyOptions()) : this(
         options,
@@ -124,6 +148,12 @@ public class SpotifyAudioSourceManager internal constructor(
             } else {
                 null
             },
+        lyricsService =
+            if (options.lyrics) {
+                createLyricsService(options, httpInterfaceManager, tokenManager, apiRouter)
+            } else {
+                null
+            },
     )
 
     override fun getSourceName(): String = "spotify"
@@ -132,7 +162,7 @@ public class SpotifyAudioSourceManager internal constructor(
         manager: AudioPlayerManager,
         reference: AudioReference,
     ): AudioItem? {
-        _playerManager = manager
+        this.playerManager = manager
         val rawIdentifier = reference.identifier
         // unwrap short link redirects before checking url patterns
         val resolvedIdentifier =
@@ -177,7 +207,8 @@ public class SpotifyAudioSourceManager internal constructor(
                 }
             }
 
-        if (item !== AudioReference.NO_TRACK && link !is SpotifyLink.Search) {
+        val isTruncated = (item as? SpotifyAudioPlaylist)?.truncated == true
+        if (item !== AudioReference.NO_TRACK && link !is SpotifyLink.Search && !isTruncated) {
             metadataCache.put(
                 resolvedIdentifier,
                 item,
@@ -202,7 +233,9 @@ public class SpotifyAudioSourceManager internal constructor(
                     author = item.author,
                     artworkUrl = item.artworkUrl,
                     totalTracks = item.totalTracks,
+                    truncated = item.truncated,
                 )
+
             is AudioPlaylist ->
                 BasicAudioPlaylist(
                     item.name,
@@ -210,6 +243,7 @@ public class SpotifyAudioSourceManager internal constructor(
                     item.selectedTrack?.makeClone(),
                     item.isSearchResult,
                 )
+
             else -> item
         }
 
@@ -227,53 +261,92 @@ public class SpotifyAudioSourceManager internal constructor(
         if (artworkColors == null && canvasLookup == null) {
             return
         }
-        // launch canvas and color lookups in parallel with a strict timeout
+
         val canvasFuture =
             if (canvasLookup != null) {
-                CompletableFuture.supplyAsync {
-                    try {
-                        canvasLookup.fetchCanvasUrl(id)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
+                CompletableFuture.supplyAsync(
+                    {
+                        try {
+                            canvasLookup.fetchCanvasUrl(id)
+                        } catch (e: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            null
+                        }
+                    },
+                    enrichmentExecutor,
+                )
             } else {
                 null
             }
 
         val colorsFuture =
             if (artworkColors != null && !audioTrack.info.artworkUrl.isNullOrBlank()) {
-                CompletableFuture.supplyAsync {
-                    try {
-                        artworkColors.fetchColors(audioTrack.info.artworkUrl)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
+                CompletableFuture.supplyAsync(
+                    {
+                        try {
+                            artworkColors.fetchColors(audioTrack.info.artworkUrl)
+                        } catch (e: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            null
+                        }
+                    },
+                    enrichmentExecutor,
+                )
             } else {
                 null
             }
 
+        val deadlineNanos =
+            System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ENRICHMENT_TIMEOUT_MS)
+
         try {
-            canvasFuture?.get(1500, TimeUnit.MILLISECONDS)?.let {
-                audioTrack.canvasUrl = it
+            if (canvasFuture != null) {
+                val remainingMs =
+                    TimeUnit.NANOSECONDS.toMillis(
+                        (deadlineNanos - System.nanoTime()).coerceAtLeast(0),
+                    )
+                if (remainingMs > 0) {
+                    canvasFuture.get(remainingMs, TimeUnit.MILLISECONDS)?.let {
+                        audioTrack.canvasUrl = it
+                    }
+                } else {
+                    log.debug("canvas lookup skipped due to expired deadline for {}", id.value)
+                }
             }
-        } catch (e: java.util.concurrent.TimeoutException) {
+        } catch (e: TimeoutException) {
+            log.debug("canvas lookup timed out for {}: {}", id.value, e.message)
         } catch (e: Exception) {
+            log.debug("canvas lookup failed for {}: {}", id.value, e.message)
+        } finally {
+            canvasFuture?.cancel(true)
         }
 
         try {
-            colorsFuture?.get(1500, TimeUnit.MILLISECONDS)?.let { extracted ->
-                val map = mutableMapOf<String, String>()
-                extracted.dark?.let { map["dark"] = it }
-                extracted.light?.let { map["light"] = it }
-                extracted.raw?.let { map["raw"] = it }
-                if (map.isNotEmpty()) {
-                    audioTrack.colors = map
+            if (colorsFuture != null) {
+                val remainingMs =
+                    TimeUnit.NANOSECONDS.toMillis(
+                        (deadlineNanos - System.nanoTime()).coerceAtLeast(0),
+                    )
+                if (remainingMs > 0) {
+                    colorsFuture.get(remainingMs, TimeUnit.MILLISECONDS)?.let { extracted ->
+                        val map = mutableMapOf<String, String>()
+                        extracted.dark?.let { map["dark"] = it }
+                        extracted.light?.let { map["light"] = it }
+                        extracted.raw?.let { map["raw"] = it }
+                        if (map.isNotEmpty()) {
+                            audioTrack.colors = map
+                        }
+                    }
+                } else {
+                    log.debug("colors lookup skipped due to expired deadline for {}", id.value)
                 }
             }
-        } catch (e: java.util.concurrent.TimeoutException) {
+        } catch (e: TimeoutException) {
+            log.debug("colors lookup timed out for {}: {}", id.value, e.message)
         } catch (e: Exception) {
+            log.debug("colors lookup failed for {}: {}", id.value, e.message)
+        } finally {
+            colorsFuture?.cancel(true)
         }
     }
 
@@ -410,13 +483,28 @@ public class SpotifyAudioSourceManager internal constructor(
 
     private fun isSpotifyIdentifier(identifier: String): Boolean {
         val trimmed = identifier.trim()
-        return trimmed.startsWith("spsearch:") ||
+        if (trimmed.startsWith("spsearch:") ||
             trimmed.startsWith("spsuggest:") ||
             trimmed.startsWith("sprec:") ||
             trimmed.startsWith("spsimilar:") ||
             trimmed.startsWith("spotify:") ||
-            trimmed.contains("spotify.com/") ||
             shortLinkResolver.isShortLink(trimmed)
+        ) {
+            return true
+        }
+        val host =
+            try {
+                val withScheme =
+                    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                        trimmed
+                    } else {
+                        "https://$trimmed"
+                    }
+                URI.create(withScheme).host?.lowercase(Locale.ROOT)
+            } catch (e: Exception) {
+                null
+            }
+        return host == "open.spotify.com" || host == "spotify.com"
     }
 
     override fun isTrackEncodable(track: AudioTrack): Boolean = true
@@ -425,12 +513,83 @@ public class SpotifyAudioSourceManager internal constructor(
         track: AudioTrack,
         output: DataOutput,
     ) {
+        val spotifyTrack = track as? SpotifyAudioTrack
+        output.writeByte(TRACK_VERSION)
+
+        val canvas = spotifyTrack?.canvasUrl
+        if (canvas != null) {
+            output.writeBoolean(true)
+            output.writeUTF(canvas)
+        } else {
+            output.writeBoolean(false)
+        }
+
+        val colors = spotifyTrack?.colors
+        if (colors != null) {
+            output.writeBoolean(true)
+            output.writeInt(colors.size)
+            for ((key, value) in colors) {
+                output.writeUTF(key)
+                output.writeUTF(value)
+            }
+        } else {
+            output.writeBoolean(false)
+        }
+
+        val preview = spotifyTrack?.previewUrl
+        if (preview != null) {
+            output.writeBoolean(true)
+            output.writeUTF(preview)
+        } else {
+            output.writeBoolean(false)
+        }
     }
 
     override fun decodeTrack(
         trackInfo: AudioTrackInfo,
         input: DataInput,
-    ): AudioTrack = SpotifyAudioTrack(trackInfo, this)
+    ): AudioTrack {
+        var canvasUrl: String? = null
+        var colors: Map<String, String>? = null
+        var previewUrl: String? = null
+
+        try {
+            val hasData = (input as? InputStream)?.let { it.available() > 0 } ?: true
+            if (hasData) {
+                val version = input.readByte().toInt()
+                if (version == TRACK_VERSION) {
+                    if (input.readBoolean()) {
+                        canvasUrl = input.readUTF()
+                    }
+                    if (input.readBoolean()) {
+                        val count = input.readInt()
+                        val map = LinkedHashMap<String, String>(count)
+                        for (i in 0 until count) {
+                            val key = input.readUTF()
+                            val value = input.readUTF()
+                            map[key] = value
+                        }
+                        colors = map
+                    }
+                    if (input.readBoolean()) {
+                        previewUrl = input.readUTF()
+                    }
+                }
+            }
+        } catch (_: EOFException) {
+            // older track with no extra bytes or short input
+        } catch (_: IOException) {
+            // corrupt or truncated input
+        }
+
+        return SpotifyAudioTrack(
+            trackInfo = trackInfo,
+            sourceManager = this,
+            canvasUrl = canvasUrl,
+            colors = colors,
+            previewUrl = previewUrl,
+        )
+    }
 
     override fun configureRequests(configurator: Function<RequestConfig, RequestConfig>) {
         httpInterfaceManager.configureRequests(configurator)
@@ -442,21 +601,45 @@ public class SpotifyAudioSourceManager internal constructor(
 
     override fun shutdown() {
         try {
+            enrichmentExecutor.shutdownNow()
+            enrichmentExecutor.awaitTermination(500, TimeUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            log.debug("error shutting down enrichment executor: {}", e.message)
+        }
+        try {
             metadataCache.clear()
             trackMirror.close()
         } catch (e: Exception) {
+            log.debug("error closing cache or mirror: {}", e.message)
         }
         try {
             httpInterfaceManager.close()
         } catch (e: Exception) {
+            log.debug("error closing http interface manager: {}", e.message)
         }
         try {
             tokenManager.close()
         } catch (e: Exception) {
+            log.debug("error closing token manager: {}", e.message)
         }
     }
 
     private companion object {
+        private const val METADATA_CACHE_CAP = 1_000
+        private const val TRACK_VERSION = 1
+        private const val ENRICHMENT_TIMEOUT_MS = 800L
+        private val enrichmentThreadId = AtomicInteger(0)
+
+        private fun createEnrichmentExecutor(): ExecutorService =
+            Executors.newFixedThreadPool(2) { runnable ->
+                Thread(
+                    runnable,
+                    "spotify-enrichment-${enrichmentThreadId.incrementAndGet()}",
+                ).apply {
+                    isDaemon = true
+                }
+            }
+
         private fun createHttpInterfaceManager(options: SpotifyOptions): HttpInterfaceManager {
             val manager = HttpClientTools.createDefaultThreadLocalManager()
             val timeoutMs = (options.requestTimeoutSeconds * 1000).coerceAtLeast(1000)
@@ -556,10 +739,45 @@ public class SpotifyAudioSourceManager internal constructor(
             }
             if (backends.isEmpty()) {
                 LoggerFactory.getLogger(SpotifyAudioSourceManager::class.java).warn(
-                    "no Spotify backends configured: official credentials missing and internal backend disabled",
+                    "no Spotify backends configured: official credentials missing and " +
+                        "internal backend disabled",
                 )
             }
             return ApiRouter(backends, tokenManager)
+        }
+
+        private fun createLyricsService(
+            options: SpotifyOptions,
+            httpInterfaceManager: HttpInterfaceManager,
+            tokenManager: TokenManager,
+            apiRouter: ApiRouter,
+        ): LyricsService {
+            val http = SpotifyHttp(httpInterfaceManager, tokenManager)
+            val accountConfigured = options.accountCookie.isNotBlank()
+            val resolver = TrackResolver(apiRouter)
+
+            val providers =
+                options.lyricsProviders.mapNotNull { name ->
+                    when (name) {
+                        "spotify" ->
+                            SpotifyLyricsProvider(http, tokenManager, resolver, accountConfigured)
+
+                        "lrclib" -> LrcLibProvider(http)
+                        else -> null
+                    }
+                }
+
+            if (!accountConfigured && "spotify" in options.lyricsProviders) {
+                LoggerFactory
+                    .getLogger(SpotifyAudioSourceManager::class.java)
+                    .info("lyrics: accountCookie not set, spotify lyrics skipped")
+            }
+
+            return LyricsService(
+                providers = providers,
+                foundTtl = options.lyricsCacheMinutes.minutes,
+                missingTtl = options.lyricsMissCacheMinutes.minutes,
+            )
         }
     }
 }

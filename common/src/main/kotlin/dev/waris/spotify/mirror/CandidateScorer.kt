@@ -2,6 +2,7 @@ package dev.waris.spotify.mirror
 
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo
+import java.util.Locale
 import kotlin.math.abs
 
 internal class CandidateScorer(
@@ -12,17 +13,17 @@ internal class CandidateScorer(
         target: AudioTrackInfo,
         candidate: AudioTrack,
     ): Double {
-        val targetTitle = target.title.lowercase()
-        val targetAuthor = target.author.lowercase()
-        val candidateTitle = candidate.info.title.lowercase()
-        val candidateAuthor = candidate.info.author.lowercase()
+        val targetTitle = target.title.lowercase(Locale.ROOT)
+        val targetAuthor = target.author.lowercase(Locale.ROOT)
+        val candidateTitle = candidate.info.title.lowercase(Locale.ROOT)
+        val candidateAuthor = candidate.info.author.lowercase(Locale.ROOT)
         val candidateCombined = "$candidateTitle $candidateAuthor"
 
         // combine weighted duration title and artist similarity scores
         val durationScore = scoreDuration(target.length, candidate.info.length)
         val titleScore = scoreTitle(targetTitle, candidateTitle)
         val artistScore = scoreArtist(targetAuthor, candidateCombined)
-        val penaltyScore = scorePenalties(targetTitle, candidateCombined)
+        val penaltyScore = scorePenalties(targetTitle, candidateTitle)
 
         return durationScore + titleScore + artistScore - penaltyScore
     }
@@ -100,24 +101,53 @@ internal class CandidateScorer(
 
     private fun scorePenalties(
         targetTitle: String,
-        candidateCombined: String,
+        candidateTitle: String,
     ): Double {
+        val targetTokens = tokenize(targetTitle)
+        val targetTokenSet = targetTokens.toSet()
+        val candidateTokens = tokenize(candidateTitle)
+        val candidateTokenSet = candidateTokens.toSet()
+
         var penalty = 0.0
-        for (word in PENALTY_WORDS) {
-            if (candidateCombined.contains(word) && !targetTitle.contains(word)) {
-                penalty += 100.0
+        for (penaltyTokens in PENALTY_TOKEN_LISTS) {
+            if (penaltyTokens.isEmpty()) {
+                continue
+            }
+            if (penaltyTokens.size == 1) {
+                val token = penaltyTokens[0]
+                if (!targetTokenSet.contains(token) && candidateTokenSet.contains(token)) {
+                    penalty += 100.0
+                }
+            } else {
+                val targetHasPhrase = hasPhrase(targetTokens, penaltyTokens)
+                val candidateHasPhrase = hasPhrase(candidateTokens, penaltyTokens)
+                if (!targetHasPhrase && candidateHasPhrase) {
+                    penalty += 100.0
+                }
             }
         }
         return penalty
     }
 
+    private fun hasPhrase(
+        tokens: List<String>,
+        phrase: List<String>,
+    ): Boolean {
+        if (tokens.size < phrase.size) {
+            return false
+        }
+        return tokens.windowed(phrase.size).any { it == phrase }
+    }
+
     private fun tokenize(text: String): List<String> =
         text
-            .lowercase()
-            .split(Regex("[^a-z0-9]+"))
+            .lowercase(Locale.ROOT)
+            .split(TOKEN_DELIMITER_REGEX)
             .filter { it.isNotBlank() }
 
     companion object {
+        private val TOKEN_DELIMITER_REGEX = Regex("""[^\p{L}\p{N}]+""")
+
         val PENALTY_WORDS: List<String> =
             listOf(
                 "live",
@@ -130,5 +160,13 @@ internal class CandidateScorer(
                 "instrumental",
                 "tribute",
             )
+
+        private val PENALTY_TOKEN_LISTS: List<List<String>> =
+            PENALTY_WORDS.map { word ->
+                word
+                    .lowercase(Locale.ROOT)
+                    .split(TOKEN_DELIMITER_REGEX)
+                    .filter { it.isNotBlank() }
+            }
     }
 }
