@@ -1,11 +1,11 @@
 package dev.waris.spotify
 
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager
+import com.sedmelluq.discord.lavaplayer.player.event.TrackExceptionEvent
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist
 import com.sedmelluq.discord.lavaplayer.track.AudioReference
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack
 import dev.lavalink.youtube.YoutubeAudioSourceManager
-import dev.lavalink.youtube.clients.Android
 import dev.lavalink.youtube.clients.AndroidMusic
 import dev.lavalink.youtube.clients.AndroidVr
 import dev.lavalink.youtube.clients.Ios
@@ -16,9 +16,11 @@ import dev.lavalink.youtube.clients.TvHtml5Simply
 import dev.lavalink.youtube.clients.Web
 import dev.lavalink.youtube.clients.WebEmbedded
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -54,7 +56,6 @@ class SpotifyLiveSmokeTest {
         youtubeSource =
             YoutubeAudioSourceManager(
                 TvHtml5Simply(),
-                Android(),
                 AndroidMusic(),
                 Ios(),
                 Tv(),
@@ -64,6 +65,10 @@ class SpotifyLiveSmokeTest {
                 Web(),
                 AndroidVr(),
             )
+        val youtubeOauth = System.getenv("YOUTUBE_REFRESH_TOKEN").orEmpty()
+        if (youtubeOauth.isNotBlank()) {
+            youtubeSource.useOauth2(youtubeOauth, true)
+        }
         spotifySource = SpotifyAudioSourceManager(options)
 
         playerManager.registerSourceManager(spotifySource)
@@ -85,15 +90,47 @@ class SpotifyLiveSmokeTest {
         val track = item as AudioTrack
 
         val player = playerManager.createPlayer()
+        val failure = AtomicReference<Throwable?>(null)
+        player.addListener { event ->
+            if (event is TrackExceptionEvent) {
+                failure.set(event.exception)
+            }
+        }
         player.playTrack(track)
 
         var framesReceived = 0
         val deadline = System.currentTimeMillis() + 25_000L
         while (System.currentTimeMillis() < deadline && framesReceived < 100) {
+            if (failure.get() != null) {
+                break
+            }
             val frame = player.provide(100, TimeUnit.MILLISECONDS)
             if (frame != null && frame.data != null && frame.data.isNotEmpty()) {
                 framesReceived++
             }
+        }
+
+        val error = failure.get()
+        if (error != null) {
+            val msg = error.message.orEmpty()
+            val causeMsg = error.cause?.message.orEmpty()
+            val isBotBlock =
+                msg.contains("bot", ignoreCase = true) ||
+                    msg.contains("login", ignoreCase = true) ||
+                    msg.contains("All clients failed", ignoreCase = true) ||
+                    causeMsg.contains("bot", ignoreCase = true) ||
+                    causeMsg.contains("login", ignoreCase = true) ||
+                    causeMsg.contains("All clients failed", ignoreCase = true) ||
+                    error.cause
+                        ?.javaClass
+                        ?.name
+                        ?.contains("AllClientsFailedException") == true
+
+            Assumptions.assumeFalse(
+                isBotBlock,
+                "YouTube mirror blocked runner IP ($msg)",
+            )
+            throw error
         }
 
         assertTrue(

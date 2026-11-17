@@ -29,6 +29,7 @@ jobs:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_ACCOUNT_COOKIE: ${{ secrets.SPOTIFY_ACCOUNT_COOKIE }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: ./gradlew test -PincludeLive=true --no-daemon --info
 
       - name: Upload Test Results on Failure
